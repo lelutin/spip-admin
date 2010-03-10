@@ -1,0 +1,16 @@
+<?php
+
+require_once("OptionParser.php");
+
+$option_parser = new OptionParser();
+$option_parser->add_option(array(
+    "-b", "--booh",
+    "dest" => "gah"
+));
+$args = $option_parser->parse_args($argv);
+
+//XXX replace this code by code fetching Spip's version.
+print_r($args->options);
+print_r($args->positional);
+
+?>

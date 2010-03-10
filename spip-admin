@@ -1,0 +1,174 @@
+#!/usr/bin/env php
+<?php
+
+define("USAGE",
+"Usage: spip-admin <command> [-h|--help] [arguments ...]
+       spip-admin (-h|--help)");
+
+define("DESCRIPTION",
+"spip-admin is a command-line interface to the Spip CMS that aims to simplify
+administration of sites using Spip.
+");
+
+function main($argv) {
+    if (count($argv) < 2) {
+        print_help();
+        print("\n");
+        print("Use option -h or --help to get a list of available commands\n");
+        exit(ERR_TOO_FEW_ARGUMENTS);
+    }
+
+    $command = $argv[1];
+
+    switch ($command) {
+        case "-h":
+        case "--help":
+            print_help();
+            print "\n";
+            show_command_list();
+            exit(0);
+            break;
+    }
+
+    // Pop the script name an the command name
+    $arguments = $argv;
+    unset($arguments[0]);
+    unset($arguments[1]);
+
+    dispatch($command, $arguments);
+}
+
+/******************************************************************************
+ * From here on, the fun begins. Below this comment are the definitions for all
+ * functions that make this script work.
+ *****************************************************************************/
+
+require_once("utils.php");
+
+define("COMMANDS_PATH", dirname(__FILE__). DIRECTORY_SEPARATOR. "commands");
+
+// Return codes
+define("ERR_TOO_FEW_ARGUMENTS", 1);
+define("ERR_COMMAND_DIR_NOT_FOUND", 2);
+define("ERR_UNEXISTANT_COMMAND", 3);
+
+/**
+ * Print the main help message
+ *
+ * @return void
+ * @author Gabriel Filion
+ **/
+function print_help() {
+    print(USAGE."\n\n".DESCRIPTION);
+}
+
+/**
+ * Print the list of all available commands
+ *
+ * @return void
+ * @author Me
+ **/
+function show_command_list() {
+    try {
+        $commands = get_command_list();
+    }
+    catch (FileNotFoundException $exc) {
+        bail_out(
+            "The commands directory was not found.",
+            ERR_COMMAND_DIR_NOT_FOUND
+        );
+    }
+
+    $msg = "Here is a list of all available commands:\n  ";
+    $msg .= implode("\n  ", $commands);
+    $msg .= "\n\n";
+
+    print($msg);
+}
+/**
+ * Call the requested command and pass options to it.
+ *
+ * @return void
+ * @author Gabriel Filion
+ **/
+function dispatch($command, $arguments) {
+    try {
+        $commands = get_command_list();
+    }
+    catch (FileNotFoundException $exc) {
+        bail_out(
+            "The commands directory was not found.",
+            ERR_COMMAND_DIR_NOT_FOUND
+        );
+    }
+
+    if ( ! in_array($command, $commands) ){
+        bail_out(
+            "Invalid command \"$command\". Use \"". basename(__FILE__).
+                " -h\" to see a list of available command names.",
+            ERR_UNEXISTANT_COMMAND
+        );
+    }
+
+    $cmd_path = COMMANDS_PATH. DIRECTORY_SEPARATOR. $command;
+
+    $path = realpath(__FILE__). PATH_SEPARATOR. get_include_path();
+    $args = implode(" ", $arguments);
+
+    passthru("php -d include_path=\"$path\" $cmd_path $args", $ret);
+
+    exit($ret);
+}
+
+/**
+ * Find all commands available and return an array of their names.
+ *
+ * Search through the subdirectory "commands" and get all the names. Scripts
+ * should not have extensions on their name so that the user doesn't have to
+ * use, say "cache.php" as a command name.
+ *
+ * @return array: list of script names
+ * @throws FileNotFoundException: when the commands directory cannot be found
+ * @author Gabriel Filion
+ **/
+function get_command_list() {
+    $dir_handle = @opendir(COMMANDS_PATH);
+    if ($dir_handle === false) {
+        throw new FileNotFoundException(COMMANDS_PATH);
+    }
+
+    $scripts = array();
+
+    while ($file = readdir($dir_handle)) {
+        if ($file == "." or $file == "..") {
+            continue;
+        }
+        $scripts[] = $file;
+    }
+
+    closedir($dir_handle);
+
+    return $scripts;
+}
+
+/******************************************************************************
+ * Exceptions
+ *****************************************************************************/
+
+class FileNotFoundException extends Exception {
+    function __construct($file_name) {
+        parent::__construct("File named \"$file_name\" was not found.");
+    }
+}
+
+/******************************************************************************
+ * Script execution
+ *****************************************************************************/
+
+// Only run the code when called on the CLI _and_ when the file was called
+// directly (i.e. not included). This makes testing the code easier.
+if (PHP_SAPI == "cli" && __FILE__ == realpath( $_SERVER['SCRIPT_FILENAME'] )) {
+    main($argv);
+}
+
+?>
