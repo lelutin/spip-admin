@@ -1,6 +1,6 @@
 <?php
 
-require_once("OptionParser.php");
+require_once("optparse.php");
 
 $option_parser = new OptionParser();
 $option_parser->add_option(array(

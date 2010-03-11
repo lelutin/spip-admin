@@ -41,4 +41,53 @@ function bail_out($message, $code) {
     exit($code);
 }
 
+/**
+ * Translate a string of text
+ *
+ * Try and find a translation corresponding to the given string of text. If no
+ * translation program is available, fall back to the raw given text.
+ *
+ * @return String : the [hopefully] translated text
+ * @author Gabriel Filion
+ **/
+function _translate($text, $variables=array() ) {
+    $translator = _translate_find_method();
+
+    $new_text = $translator($text);
+
+    // Use values from $variables to replace pattends of the form %(name)s
+    foreach ($variables as $name => $var) {
+        $new_text = preg_replace("/%\($name\)s/", $var, $new_text);
+    }
+
+    return $new_text;
+}
+
+/**
+ * Find what function should be used for translation.
+ *
+ * Try and detect the translation that should be used. If no translation is
+ * possible, fall back to a function that simply sends back the text.
+ *
+ * @return String representation of the appropriate function name
+ * @author Gabriel Filion
+ **/
+function _translate_find_method() {
+    //TODO really detect something
+    return "_translate_no_translation";
+}
+
+/**
+ * Dummy translation function that does no translation
+ *
+ * This dummy translation function is used when no translation function was
+ * detected. It simply returns the text with no modification.
+ *
+ * @return String of text
+ * @author Gabriel Filion
+ **/
+function _translate_no_translation($text) {
+    return $text;
+}
+
 ?>

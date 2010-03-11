@@ -1,20 +1,28 @@
 #!/usr/bin/env php
 <?php
 
-define("USAGE",
-"Usage: spip-admin <command> [-h|--help] [arguments ...]
-       spip-admin (-h|--help)");
+require_once("utils.php");
 
-define("DESCRIPTION",
+define("USAGE", _translate(
+"Usage: spip-admin <command> [-h|--help] [arguments ...]
+       spip-admin (-h|--help)"
+) );
+
+define("DESCRIPTION", _translate(
 "spip-admin is a command-line interface to the Spip CMS that aims to simplify
 administration of sites using Spip.
-");
+"
+) );
 
 function main($argv) {
     if (count($argv) < 2) {
+        $more_help = _translate(
+            "Use option -h or --help to get a list of available commands\n"
+        );
+
         print_help();
         print("\n");
-        print("Use option -h or --help to get a list of available commands\n");
+        print($more_help);
         exit(ERR_TOO_FEW_ARGUMENTS);
     }
 
@@ -42,8 +50,6 @@ function main($argv) {
  * From here on, the fun begins. Below this comment are the definitions for all
  * functions that make this script work.
  *****************************************************************************/
-
-require_once("utils.php");
 
 define("COMMANDS_PATH", dirname(__FILE__). DIRECTORY_SEPARATOR. "commands");
 
@@ -79,12 +85,13 @@ function show_command_list() {
         );
     }
 
-    $msg = "Here is a list of all available commands:\n  ";
+    $msg = _translate("Here is a list of all available commands:"). "\n  ";
     $msg .= implode("\n  ", $commands);
     $msg .= "\n\n";
 
     print($msg);
 }
+
 /**
  * Call the requested command and pass options to it.
  *
@@ -97,15 +104,21 @@ function dispatch($command, $arguments) {
     }
     catch (FileNotFoundException $exc) {
         bail_out(
-            "The commands directory was not found.",
+            _translate("The commands directory was not found."),
             ERR_COMMAND_DIR_NOT_FOUND
         );
     }
 
     if ( ! in_array($command, $commands) ){
-        bail_out(
-            "Invalid command \"$command\". Use \"". basename(__FILE__).
+        $vals = array( "command" => $command, "prog" => basename(__FILE__) );
+        $msg = _translate(
+            "Invalid command \"%(command)s\". Use \"%(prog)s".
                 " -h\" to see a list of available command names.",
+            $vals
+        );
+
+        bail_out(
+            $msg,
             ERR_UNEXISTANT_COMMAND
         );
     }
@@ -157,7 +170,9 @@ function get_command_list() {
 
 class FileNotFoundException extends Exception {
     function __construct($file_name) {
-        parent::__construct("File named \"$file_name\" was not found.");
+        $vals = array( "file" => $file_name );
+        $msg = _translate("File named \"%(file)s\" was not found.", $vals);
+        parent::__construct($msg);
     }
 }
 

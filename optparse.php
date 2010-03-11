@@ -26,7 +26,8 @@ class OptionParser {
         $this->_options = array();
 
         $prog = basename($_SERVER["SCRIPT_FILENAME"]);
-        $default_usage = "Usage: $prog [arguments ...]";
+        $vals = array("prog" => $prog);
+        $default_usage = _translate("Usage: %(prog)s [arguments ...]", $vals);
         $this->_usage = array_get($settings, "usage", $default_usage);
 
         $add_help_option = array_get($settings, "add_help_option", true);
@@ -35,7 +36,7 @@ class OptionParser {
             $this->add_option( array(
                 "-h","--help",
                 "dest" => "help",
-                "callback" => "_display_help",
+                "callback" => "_optparse_display_help",
                 "help" => "show this help message and exit"
             ) );
         }
@@ -48,7 +49,16 @@ class OptionParser {
      * @author Gabriel Filion
      **/
     public function add_option($settings) {
-        $this->_options[] = new Option($settings);
+        $new_option = new Option($settings);
+
+        // Yell if an option text (e.g. --option) is already used.
+        foreach ( $new_option->argument_names as $name ) {
+            if ( $this->_find_option($name) !== Null ) {
+                throw new DuplicateOptionException($name);
+            }
+        }
+
+        $this->_options[] = $new_option;
     }
 
     /**
@@ -64,8 +74,8 @@ class OptionParser {
         array_shift($argv);
 
         if ( $values !== Null && ! is_array($values) ) {
-            $msg = "Default values must be in an array";
-            throw new Exception($msg);
+            $msg = _translate("Default values must be in an array");
+            throw new InvalidArgumentException($msg);
         }
 
         if ($values === Null) {
@@ -107,8 +117,11 @@ class OptionParser {
         $option = $this->_find_option($option_text);
 
         if ($option === Null) {
+            $vals = array("option" => $option_text);
+            $msg = _translate("Error: No such option: %(option)s", $vals);
+
             print($this->_usage."\n\n");
-            print("Error: No such option: $option_text\n");
+            print($msg. "\n");
             exit(NO_SUCH_ERROR);
         }
 
@@ -156,7 +169,7 @@ class OptionParser {
  * @return void
  * @author Gabriel Filion
  **/
-function _display_help($dummy, $parser) {
+function _optparse_display_help($dummy, $parser) {
     // Print usage
     print( basename($_SERVER['SCRIPT_FILENAME']). $parser->usage. "\n\n" );
 
@@ -214,13 +227,13 @@ class Option {
         }
 
         if ( empty($argument_names) ) {
-            $msg = "An option must have at least one representation string";
-            throw new Exception($msg);
+            $msg = "An option must have at least one string representation";
+            throw new InvalidArgumentException($msg);
         }
 
         $this->argument_names = $argument_names;
 
-        $this->help_text = array_get($settings, "help", "");
+        $this->help_text = _translate( array_get($settings, "help", "") );
         $this->callback = array_get($settings, "callback", Null);
         $this->dest = array_get($settings, "dest", $longest_name);
     }
@@ -259,10 +272,25 @@ class Option {
         $call_method = "";
         foreach ($this->argument_names as $name) {
             //FIXME this is not correct. dest must be shown only when needed.
-            $call_method .= $name. " ". strtoupper($this->dest). " ";
+            $dest = _translate($this->dest);
+            $call_method .= $name. " ". strtoupper($dest). " ";
         }
 
-        return $call_method. " ". $this->help_text;
+        return $call_method. " ". _translate($this->help_text);
     }
 }
+
+/**
+ * Exception on duplicate options
+ *
+ * Exception raised when an option added tries to use a string representation
+ * (e.g. "--option") that is already used by a previously added option.
+ **/
+class DuplicateOptionException extends Exception {
+    function DuplicateOptionException($name) {
+        $msg = _translate("Duplicate definition of option \"$name\"");
+        parent::__construct($msg);
+    }
+}
+
 ?>
