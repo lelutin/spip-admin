@@ -70,7 +70,7 @@ class OptionParser {
      * @author Gabriel Filion <gfilion@revolutionlinux.com>
      **/
     public function parse_args($argv, $values=Null){
-        // Pop out the first argument, it is the command name
+        // Pop out the first argument, it is assumed to be the command name
         array_shift($argv);
 
         if ( $values !== Null && ! is_array($values) ) {
@@ -82,6 +82,7 @@ class OptionParser {
             $values = $this->_get_default_values();
         }
 
+        $positional = array();
         foreach ($argv as $arg){
             // Options should begin with a dash. All else is positional
             if (substr($arg,0,1) != "-"){
