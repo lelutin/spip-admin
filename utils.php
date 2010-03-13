@@ -30,6 +30,30 @@ function array_get($array, $key, $default=null) {
 }
 
 /**
+ * Append an array or a value to an array.
+ *
+ * Strangely, PHP has no function to simply append (not merge) an array to
+ * another one. This provides for this lacking feature.
+ *
+ * The first array is modified in place, so nothing is returned.
+ *
+ * This function discards keys from the second array. To conserve the keys, use
+ * array_merge.
+ *
+ * @return void
+ * @author Gabriel Filion
+ **/
+function array_append(&$array, $appended) {
+    if ( ! is_array($appended) ) {
+        $array[] = $appended;
+    }
+
+    foreach ( $appended as $value ) {
+        $array[] = $value;
+    }
+}
+
+/**
  * Exit with an exit code and print a message to stdout.
  *
  * @return void

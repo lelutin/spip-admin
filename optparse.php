@@ -12,7 +12,8 @@
  */
 require_once("utils.php");
 
-define("NO_SUCH_ERROR", 1);
+define("NO_SUCH_OPT_ERROR", 1);
+define("WRONG_VALUE_COUNT_ERROR", 2);
 
 /**
  * Utility class for parsing arguments from the Command Line Interface
@@ -25,8 +26,7 @@ class OptionParser {
         $this->_positional = array();
         $this->_options = array();
 
-        $prog = basename($_SERVER["SCRIPT_FILENAME"]);
-        $vals = array("prog" => $prog);
+        $vals = array( "prog" => $this->get_prog_name() );
         $default_usage = _translate("Usage: %(prog)s [arguments ...]", $vals);
         $this->_usage = array_get($settings, "usage", $default_usage);
 
@@ -82,26 +82,166 @@ class OptionParser {
             $values = $this->_get_default_values();
         }
 
+        $rargs = $argv;
+
         $positional = array();
-        foreach ($argv as $arg){
+        while ( ! empty($rargs) ){
+            $arg = array_shift($rargs);
+
+            // Stop processing on a -- argument
+            if ( $arg == "--" ) {
+                // All remaining arguments are positional
+                array_append($positional, $rargs);
+                break;
+            }
+
             // Options should begin with a dash. All else is positional
-            if (substr($arg,0,1) != "-"){
+            if ( substr($arg, 0, 1) != "-" ) {
                 $positional[] = $arg;
                 continue;
             }
 
-            $key_value = explode("=", $arg, 2);
-
-            if (count($key_value) < 2) {
-                $value = true;
+            if ( substr($arg, 0, 2) == "--" ) {
+                $this->_process_long_option($arg, $values);
             }
             else {
-                $value = $key_value[1];
+                // values will be removed from $rargs during this process
+                $this->_process_short_option($arg, $rargs, $values);
             }
-            $this->_process_option($key_value[0], $value, $values);
         }
 
         return new Values($values, $positional);
+    }
+
+    /**
+     * Process a long option.
+     *
+     * Long options are binary options, or they expect their value(s) to be
+     * appended to them with = as a separator. If an option expects more than
+     * one value, they should be a comma separated list.
+     * Examples:
+     *     program --enable-this
+     *     program --option=value
+     *     program --option=value1,value2
+     *
+     * @return void
+     * @author Gabriel Filion
+     **/
+    private function _process_long_option($argument, &$values) {
+        $key_value = explode("=", $argument, 2);
+        $arg_text = $key_value[0];
+
+        $option = $this->_find_option($arg_text);
+
+        if ( count($key_value) > 1 ) {
+            $opt_values = explode(",", $key_value[1]);
+        }
+        else {
+            $opt_values = array();
+        }
+
+        if ( count($opt_values) < $option->nb_values ) {
+            if ($option->nb_values == 1) {
+                $vals = array("option" => $argument);
+                $msg = _translate(
+                    "%(option)s option takes a value.",
+                    $vals
+                );
+
+                $this->error($msg, WRONG_VALUE_COUNT_ERROR);
+            }
+            else {
+                $vals = array(
+                    "option" => $argument,
+                    "nbvals" => $option->nb_values
+                );
+                $msg = _translate(
+                    "%(option)s option takes %(nbvals)s values.",
+                    $vals
+                );
+
+                $this->error($msg, WRONG_VALUE_COUNT_ERROR);
+            }
+
+        }
+
+        if (count($opt_values) < 1) {
+            $value = true;
+        }
+        else {
+            if ($option->nb_values < 1) {
+                $vals = array("option" => $argument);
+                $msg = _translate(
+                    "%(option)s option does not take a value.",
+                    $vals
+                );
+
+                $this->error($msg, WRONG_VALUE_COUNT_ERROR);
+            }
+
+            $value = $opt_values;
+        }
+
+        $this->_process_option($option, $arg_text, $value, $values);
+    }
+
+    /**
+     * Process a short option.
+     *
+     * Short options are binary options, or they expect their value(s) to be in
+     * the following arguments.
+     * Examples:
+     *     program -q
+     *     program -d something
+     *
+     * @return void
+     * @author Gabriel Filion
+     **/
+    private function _process_short_option($argument,
+                                           &$rargs,
+                                           &$values)
+    {
+        $option = $this->_find_option($argument);
+
+        $nbvals = $option->nb_values;
+
+        if ( $nbvals == 0 ) {
+            $value = True;
+        }
+        else {
+            $value = array();
+        }
+
+        if ( count($rargs) < $nbvals ) {
+            if ( $nbvals == 1) {
+                $vals = array("option" => $argument);
+                $msg = _translate(
+                    "%(option)s option takes an argument.",
+                    $vals
+                );
+            }
+            else {
+                $vals = array("option" => $argument, "nbargs" => $nbvals);
+                $msg = _translate(
+                    "%(option)s option takes %(nbargs)s arguments.",
+                    $vals
+                );
+            }
+
+            $this->error($msg, WRONG_VALUE_COUNT_ERROR);
+        }
+
+        while ( $nbvals ) {
+            $value[] = array_pop($rargs);
+            $nbvals--;
+        }
+
+        // If only one value, set it directly as the value (not in an array)
+        if ( $option->nb_values == 1 ) {
+            $value = $value[0];
+        }
+
+        $this->_process_option($option, $argument, $value, $values);
     }
 
     /**
@@ -114,16 +254,12 @@ class OptionParser {
      * @return void
      * @author Gabriel Filion
      **/
-    private function _process_option($option_text, $value, &$values) {
-        $option = $this->_find_option($option_text);
-
+    private function _process_option($option, $option_text, $value, &$values) {
         if ($option === Null) {
             $vals = array("option" => $option_text);
             $msg = _translate("Error: No such option: %(option)s", $vals);
 
-            print($this->_usage."\n\n");
-            print($msg. "\n");
-            exit(NO_SUCH_ERROR);
+            $this->error($msg, NO_SUCH_OPT_ERROR);
         }
 
         $option->process($value, $values, $this);
@@ -159,6 +295,41 @@ class OptionParser {
         //TODO implement this
         return array();
     }
+
+    /**
+     * Exit program with an error message and code
+     *
+     * @return void
+     * @author Gabriel Filion
+     **/
+    public function error($text, $code) {
+        $this->print_usage(STDERR);
+        fprintf(STDERR, $this->get_prog_name(). ": error: ". $text. "\n");
+        exit($code);
+    }
+
+    /**
+     * Print usage
+     *
+     * Print usage message. Default output stream is stdout. To change it, pass
+     * another stream as argument.
+     *
+     * @return void
+     * @author Gabriel Filion
+     **/
+    public function print_usage($stream=STDOUT) {
+        fprintf($stream, $this->get_prog_name(). ": ". $this->_usage. "\n\n");
+    }
+
+    /**
+     * Retrieve program name
+     *
+     * @return String
+     * @author Gabriel Filion
+     **/
+    public function get_prog_name() {
+        return basename($_SERVER['SCRIPT_FILENAME']);
+    }
 }
 
 /**
@@ -172,7 +343,7 @@ class OptionParser {
  **/
 function _optparse_display_help($dummy, $parser) {
     // Print usage
-    print( basename($_SERVER['SCRIPT_FILENAME']). $parser->usage. "\n\n" );
+    $parser->print_usage();
 
     // List all available options
     print("Options:\n");
@@ -228,7 +399,9 @@ class Option {
         }
 
         if ( empty($argument_names) ) {
-            $msg = "An option must have at least one string representation";
+            $msg = _translate(
+                "An option must have at least one string representation"
+            );
             throw new InvalidArgumentException($msg);
         }
 
@@ -237,6 +410,12 @@ class Option {
         $this->help_text = _translate( array_get($settings, "help", "") );
         $this->callback = array_get($settings, "callback", Null);
         $this->dest = array_get($settings, "dest", $longest_name);
+
+        $this->nb_values = array_get($settings, "nargs", 1);
+        if ($this->nb_values < 0) {
+            $msg = _translate("nargs setting to Option cannot be negative");
+            throw new InvalidArgumentException($msg);
+        }
     }
 
     /**
