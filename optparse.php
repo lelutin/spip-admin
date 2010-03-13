@@ -53,12 +53,85 @@ class OptionParser {
 
         // Yell if an option text (e.g. --option) is already used.
         foreach ( $new_option->argument_names as $name ) {
-            if ( $this->_find_option($name) !== Null ) {
+            if ( $this->get_option($name) !== Null ) {
                 throw new DuplicateOptionException($name);
             }
         }
 
         $this->_options[] = $new_option;
+    }
+
+    /**
+     * Search for an option name in current options.
+     *
+     * Given an option string, search for the Option object that uses this
+     * string. If the option cannot be found, return Null.
+     *
+     * @return Option object: when the option is found
+     * @return Null: when the option is not found
+     * @author Gabriel Filion
+     **/
+    public function get_option($text) {
+        $found = Null;
+
+        foreach ($this->_options as $opt) {
+            if ( in_array($text, $opt->argument_names) ) {
+                $found = $opt;
+                break;
+            }
+        }
+
+        return $found;
+    }
+
+    /**
+     * Verify if an option is present in the parser
+     *
+     * Given an option string, verify if one of the parser's options uses this
+     * string. It is a convenient way to verify if an option was already added.
+     *
+     * @return boolean: true if option is present, false if not
+     * @author Gabriel Filion
+     **/
+    public function has_option($text) {
+        foreach ($this->_options as $opt) {
+            if ( in_array($text, $opt->argument_names) ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Remove the option corresponding to a string
+     *
+     * Remove the option that uses the given string. If the option uses other
+     * strings of text, those strings become invalid (unused). If the text does
+     * not correspond to an option, a OutOfBoundsException is thrown.
+     *
+     * @return void
+     * @author Gabriel Filion
+     **/
+    public function remove_option($text) {
+        $found = false;
+
+        foreach ($this->_options as $key => $opt) {
+            if ( in_array($text, $opt->argument_names) ) {
+                unset( $this->_options[$key] );
+                $found = true;
+            }
+        }
+
+        if (! $found) {
+            $vals = array("option" => $text);
+            $msg = _translate(
+                "Option \"%(option)s\" does not exist.",
+                $vals
+            );
+
+            throw new OutOfBoundsException($msg);
+        }
     }
 
     /**
@@ -294,7 +367,7 @@ class OptionParser {
      * @author Gabriel Filion
      **/
     private function _get_known_option($opt_text) {
-        $option = $this->_find_option($opt_text);
+        $option = $this->get_option($opt_text);
 
         // Unknown option. Exit with an error
         if ($option === Null) {
@@ -305,26 +378,6 @@ class OptionParser {
         }
 
         return $option;
-    }
-
-    /**
-     * Search for an option name in current options.
-     *
-     * @return Option object: when the option is found
-     * @return Null: when the option is not found
-     * @author Gabriel Filion
-     **/
-    private function _find_option($text) {
-        $found = Null;
-
-        foreach ($this->_options as $opt) {
-            if ( in_array($text, $opt->argument_names) ) {
-                $found = $opt;
-                break;
-            }
-        }
-
-        return $found;
     }
 
     /**
