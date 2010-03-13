@@ -132,7 +132,7 @@ class OptionParser {
         $key_value = explode("=", $argument, 2);
         $arg_text = $key_value[0];
 
-        $option = $this->_find_option($arg_text);
+        $option = $this->_get_known_option($arg_text);
 
         if ( count($key_value) > 1 ) {
             $opt_values = explode(",", $key_value[1]);
@@ -183,7 +183,7 @@ class OptionParser {
             $value = $opt_values;
         }
 
-        $this->_process_option($option, $arg_text, $value, $values);
+        $option->process($value, $arg_text, $values, $this);
     }
 
     /**
@@ -202,7 +202,7 @@ class OptionParser {
                                            &$rargs,
                                            &$values)
     {
-        $option = $this->_find_option($argument);
+        $option = $this->_get_known_option($argument);
 
         $nbvals = $option->nb_values;
 
@@ -242,28 +242,30 @@ class OptionParser {
             $value = $value[0];
         }
 
-        $this->_process_option($option, $argument, $value, $values);
+        $option->process($value, $argument, $values, $this);
     }
 
     /**
-     * Process an option.
+     * Find an option but exit if it is not known
      *
-     * Follow the option creation logic. First, verify existance of the
-     * requested option. If the option is not found, display an error message
-     * and exit. Let the option do the rest of the processing.
+     * Find an option with the text from command line. If the option cannot be
+     * found, exit with and error.
      *
-     * @return void
+     * @return Option object
      * @author Gabriel Filion
      **/
-    private function _process_option($option, $option_text, $value, &$values) {
+    private function _get_known_option($opt_text) {
+        $option = $this->_find_option($opt_text);
+
+        // Unknown option. Exit with an error
         if ($option === Null) {
-            $vals = array("option" => $option_text);
-            $msg = _translate("Error: No such option: %(option)s", $vals);
+            $vals = array("option" => $opt_text);
+            $msg = _translate("No such option: %(option)s", $vals);
 
             $this->error($msg, NO_SUCH_OPT_ERROR);
         }
 
-        $option->process($value, $option_text, $values, $this);
+        return $option;
     }
 
     /**
