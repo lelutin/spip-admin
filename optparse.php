@@ -26,9 +26,8 @@ class OptionParser {
         $this->_positional = array();
         $this->_options = array();
 
-        $vals = array( "prog" => $this->get_prog_name() );
-        $default_usage = _translate("Usage: %(prog)s [arguments ...]", $vals);
-        $this->_usage = array_get($settings, "usage", $default_usage);
+        $default_usage = _translate("%prog [arguments ...]");
+        $this->set_usage( array_get($settings, "usage", $default_usage) );
 
         $add_help_option = array_get($settings, "add_help_option", true);
 
@@ -60,6 +59,46 @@ class OptionParser {
         }
 
         $this->_options[] = $new_option;
+    }
+
+    /**
+     * Set the usage text
+     *
+     * @return void
+     * @author Gabriel Filion
+     **/
+    public function set_usage($new_usage) {
+        // Replace occurences of %prog to the program name
+        $new_usage = preg_replace(
+            "/\%prog/",
+            get_prog_name(),
+            $new_usage
+        );
+
+        $this->_usage = $new_usage;
+    }
+
+    /**
+     * Retrieve usage string
+     *
+     * @return String
+     * @author Gabriel Filion
+     **/
+    public function get_usage() {
+        return $this->_usage;
+    }
+
+    /**
+     * Print usage
+     *
+     * Print usage message. Default output stream is stdout. To change it, pass
+     * another stream as argument.
+     *
+     * @return void
+     * @author Gabriel Filion
+     **/
+    public function print_usage($stream=STDOUT) {
+        fprintf($stream, "Usage: ". $this->get_usage(). "\n\n" );
     }
 
     /**
@@ -307,31 +346,7 @@ class OptionParser {
      **/
     public function error($text, $code) {
         $this->print_usage(STDERR);
-        fprintf(STDERR, $this->get_prog_name(). ": error: ". $text. "\n");
-        exit($code);
-    }
-
-    /**
-     * Print usage
-     *
-     * Print usage message. Default output stream is stdout. To change it, pass
-     * another stream as argument.
-     *
-     * @return void
-     * @author Gabriel Filion
-     **/
-    public function print_usage($stream=STDOUT) {
-        fprintf($stream, $this->get_prog_name(). ": ". $this->_usage. "\n\n");
-    }
-
-    /**
-     * Retrieve program name
-     *
-     * @return String
-     * @author Gabriel Filion
-     **/
-    public function get_prog_name() {
-        return basename($_SERVER['SCRIPT_FILENAME']);
+        bail_out($text, $code);
     }
 }
 

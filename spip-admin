@@ -80,7 +80,7 @@ function show_command_list() {
     }
     catch (FileNotFoundException $exc) {
         bail_out(
-            "The commands directory was not found.",
+            _translate("The commands directory was not found."),
             ERR_COMMAND_DIR_NOT_FOUND
         );
     }
@@ -110,7 +110,7 @@ function dispatch($command, $arguments) {
     }
 
     if ( ! in_array($command, $commands) ){
-        $vals = array( "command" => $command, "prog" => basename(__FILE__) );
+        $vals = array( "command" => $command, "prog" => get_prog_name() );
         $msg = _translate(
             "Invalid command \"%(command)s\". Use \"%(prog)s".
                 " -h\" to see a list of available command names.",

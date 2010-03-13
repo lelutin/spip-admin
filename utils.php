@@ -20,7 +20,9 @@
  **/
 function array_get($array, $key, $default=null) {
     if ( ! is_string($key) ) {
-        $msg = "The \$key argument (second argument) must be a string";
+        $msg = _translate(
+            "The \$key argument (second argument) must be a string"
+        );
         throw new InvalidArgumentException($msg);
     }
     if ( ! array_key_exists($key, $array) ) {
@@ -76,6 +78,18 @@ function array_append(&$array, $appended) {
 }
 
 /**
+ * Retrieve program name
+ *
+ * Get the file name, without the directory, of the script that was called.
+ *
+ * @return String
+ * @author Gabriel Filion
+ **/
+function get_prog_name() {
+    return basename($_SERVER['SCRIPT_FILENAME']);
+}
+
+/**
  * Exit with an exit code and print a message to stdout.
  *
  * @return void
@@ -83,7 +97,10 @@ function array_append(&$array, $appended) {
  **/
 function bail_out($message, $code) {
     $prog = basename($_SERVER['SCRIPT_FILENAME']);
-    fprintf(STDERR, $prog.": Error: $message\n");
+
+    $l10n_error = _translate("error");
+
+    fprintf(STDERR, "$prog: $l10n_error: $message\n");
     exit($code);
 }
 
