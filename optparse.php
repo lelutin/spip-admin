@@ -379,7 +379,7 @@ class Option {
 
         $i = 0;
         $longest_name = "";
-        while ( $option_name = array_get($settings, "$i") ) {
+        while ( $option_name = array_pop_elem($settings, "$i") ) {
             $argument_names[] = $option_name;
 
             // Get the name without leading dashes
@@ -407,14 +407,19 @@ class Option {
 
         $this->argument_names = $argument_names;
 
-        $this->help_text = _translate( array_get($settings, "help", "") );
-        $this->callback = array_get($settings, "callback", Null);
-        $this->dest = array_get($settings, "dest", $longest_name);
+        $this->help_text = _translate( array_pop_elem($settings, "help", "") );
+        $this->callback = array_pop_elem($settings, "callback", Null);
+        $this->dest = array_pop_elem($settings, "dest", $longest_name);
 
-        $this->nb_values = array_get($settings, "nargs", 1);
+        $this->nb_values = array_pop_elem($settings, "nargs", 1);
         if ($this->nb_values < 0) {
             $msg = _translate("nargs setting to Option cannot be negative");
             throw new InvalidArgumentException($msg);
+        }
+
+        // Yell if any superfluous arguments are given.
+        if ( ! empty($settings) ) {
+            throw new UnknownSettingsException($settings);
         }
     }
 
@@ -469,6 +474,22 @@ class Option {
 class DuplicateOptionException extends Exception {
     function DuplicateOptionException($name) {
         $msg = _translate("Duplicate definition of option \"$name\"");
+        parent::__construct($msg);
+    }
+}
+
+/**
+ * Exception on superfluous arguments
+ *
+ * Exception raised when unknown options are passed to Option's constructor.
+ **/
+class UnknownSettingsException extends Exception {
+    function UnknownSettingsException($arguments) {
+        $args_as_string = implode(", ", array_keys($arguments) );
+
+        $msg = _translate(
+            "The following settings are unknown: $args_as_string"
+        );
         parent::__construct($msg);
     }
 }

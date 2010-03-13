@@ -30,6 +30,28 @@ function array_get($array, $key, $default=null) {
 }
 
 /**
+ * Retrieve an element and remove it from an array.
+ *
+ * Retrive the value for a given key in an array and remove it from that array.
+ * If the key is not present in the array, return the default value, given in
+ * the third argument. If the third argument is omitted, the default value is
+ * Null.
+ *
+ * @return mixed: value from the array or default value if key is not in array.
+ * @throws InvalidArgumentException: when $key is not a string
+ * @author Gabriel Filion
+ **/
+function array_pop_elem(&$array, $key, $default=null) {
+    $value = array_get($array, $key, $default);
+
+    if ( array_key_exists($key, $array) ) {
+        unset($array[$key]);
+    }
+
+    return $value;
+}
+
+/**
  * Append an array or a value to an array.
  *
  * Strangely, PHP has no function to simply append (not merge) an array to
