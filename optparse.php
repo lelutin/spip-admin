@@ -37,7 +37,8 @@ class OptionParser {
                 "-h","--help",
                 "dest" => "help",
                 "callback" => "_optparse_display_help",
-                "help" => "show this help message and exit"
+                "help" => "show this help message and exit",
+                "nargs" => 0
             ) );
         }
     }
@@ -262,7 +263,7 @@ class OptionParser {
             $this->error($msg, NO_SUCH_OPT_ERROR);
         }
 
-        $option->process($value, $values, $this);
+        $option->process($value, $option_text, $values, $this);
     }
 
     /**
@@ -341,14 +342,17 @@ class OptionParser {
  * @return void
  * @author Gabriel Filion
  **/
-function _optparse_display_help($dummy, $parser) {
+function _optparse_display_help($dummy_option,
+                                $dummy_opt_text,
+                                $dummy_value,
+                                $parser) {
     // Print usage
     $parser->print_usage();
 
     // List all available options
     print("Options:\n");
     foreach ($parser->_options as $option) {
-        print("  ". $option->_str() );
+        print("  ". $option->_str(). "\n" );
     }
 
     print "\n";
@@ -429,16 +433,22 @@ class Option {
      * When used, the option must be processed. Verify value type. Call the
      * callback, if needed.
      *
+     * Callback functions should have the following signature:
+     *     function x_callback(&$option, $opt_text, $value, &$parser) { }
+     *
+     * The name of the callback function is of no importance. The first and
+     * last arguments should be passed by reference so that doing anything to
+     * them is not done to a copy of the object only.
+     *
      * @return void
      * @author Gabriel Filion
      **/
-    public function process($value, &$values, &$parser) {
-        // No type checking as of now.
+    public function process($value, $opt_text, &$values, &$parser) {
+        // FIXME No type checking as of now.
 
         if ($this->callback !== Null) {
-            //FIXME determine what to pass on to callbacks
             $callback = $this->callback;
-            $value = $callback($value, $parser);
+            $value = $callback($this, $opt_text, $value, $parser);
         }
 
         $values[$this->dest] = $value;
