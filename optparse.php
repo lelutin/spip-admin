@@ -26,6 +26,17 @@ class OptionParser {
         $this->_positional = array();
         $this->option_list = array();
 
+        // This must come first so that calls to add_option can succeed.
+        $this->option_class = array_pop_elem(
+            $settings,
+            "option_class",
+            "Option"
+        );
+        if ( ! is_string($this->option_class) ) {
+            $msg = _translate("The setting \"option_class\" must be a string");
+            throw new InvalidArgumentException($msg);
+        }
+
         $default_usage = _translate("%prog [arguments ...]");
         $this->set_usage( array_pop_elem($settings, "usage", $default_usage) );
 
@@ -63,6 +74,7 @@ class OptionParser {
             get_prog_name()
         );
 
+        // Still some settings left? we don't know about them. yell
         if ( ! empty($settings) ) {
             throw new OptionError($settings);
         }
@@ -75,7 +87,9 @@ class OptionParser {
      * @author Gabriel Filion
      **/
     public function add_option($settings) {
-        $new_option = new Option($settings);
+        $option_class = $this->option_class;
+
+        $new_option = new $option_class($settings);
 
         // Resolve conflict with the right conflict handler
         foreach ( $new_option->option_strings as $name ) {
