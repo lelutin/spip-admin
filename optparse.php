@@ -202,6 +202,29 @@ class OptionParser {
     }
 
     /**
+     * Print the help text
+     *
+     * Print the whole help message as seen with option -h. Default output
+     * stream is stdout. To change it, pass another stream as argument.
+     *
+     * @return void
+     * @author Gabriel Filion
+     **/
+    public function print_help($stream=STDOUT) {
+        // Print usage
+        $this->print_usage($stream);
+
+        // List all available options
+        $msg = _translate("Options:");
+        fprintf($stream, $msg. "\n");
+        foreach ($this->option_list as $option) {
+            fprintf($stream, "  ". $option->_str(). "\n" );
+        }
+
+        fprintf($stream, "\n");
+    }
+
+    /**
      * Parse command line arguments
      *
      * Given an array of arguments, parse them and create an object containing
@@ -513,17 +536,10 @@ class OptionParser {
 function _optparse_display_help($dummy_option,
                                 $dummy_opt_text,
                                 $dummy_value,
-                                $parser) {
-    // Print usage
-    $parser->print_usage();
+                                $parser)
+{
+    $parser->print_help();
 
-    // List all available options
-    print("Options:\n");
-    foreach ($parser->option_list as $option) {
-        print("  ". $option->_str(). "\n" );
-    }
-
-    print "\n";
     exit(0);
 }
 
