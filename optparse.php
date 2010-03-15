@@ -35,9 +35,18 @@ class OptionParser {
         if ($add_help_option) {
             $this->add_option( array(
                 "-h","--help",
-                "dest" => "help",
                 "callback" => "_optparse_display_help",
-                "help" => "show this help message and exit",
+                "help" => _translate("show this help message and exit"),
+                "nargs" => 0
+            ) );
+        }
+
+        $this->version = array_pop_elem($settings, "version", "");
+        if ($this->version) {
+            $this->add_option( array(
+                "--version",
+                "callback" => "_optparse_display_version",
+                "help" => _translate("show program's version number and exit"),
                 "nargs" => 0
             ) );
         }
@@ -196,7 +205,7 @@ class OptionParser {
         // Replace occurences of %prog to the program name
         $usage = preg_replace(
             "/\%prog/",
-            $this->prog,
+            $this->get_prog_name(),
             $this->get_usage()
         );
 
@@ -217,7 +226,7 @@ class OptionParser {
         $this->print_usage($stream);
 
         if ($this->description) {
-            fprintf($stream, $this->description. "\n\n");
+            fprintf($stream, $this->get_description(). "\n\n");
         }
 
         // List all available options
@@ -228,6 +237,56 @@ class OptionParser {
         }
 
         fprintf($stream, "\n");
+    }
+
+    /**
+     * Print version
+     *
+     * Print version information message. Default output stream is stdout. To
+     * change it, pass another stream as argument.
+     *
+     * @return void
+     * @author Gabriel Filion
+     **/
+    public function print_version($stream=STDOUT) {
+        // Replace occurences of %prog to the program name
+        $version = preg_replace(
+            "/\%prog/",
+            $this->get_prog_name(),
+            $this->get_version()
+        );
+
+        fprintf($stream, $version. "\n\n" );
+    }
+
+    /**
+     * Retrieve the program name as shown by usage
+     *
+     * @return String
+     * @author Gabriel Filion
+     **/
+    public function get_prog_name() {
+        return $this->prog;
+    }
+
+    /**
+     * Retrieve the description
+     *
+     * @return String
+     * @author Gabriel Filion
+     **/
+    public function get_description() {
+        return $this->description;
+    }
+
+    /**
+     * Retrieve the version tag
+     *
+     * @return String
+     * @author Gabriel Filion
+     **/
+    public function get_version() {
+        return $this->version;
     }
 
     /**
@@ -531,7 +590,7 @@ class OptionParser {
 }
 
 /**
- * Show a help message and exit.
+ * Show a help message and exit
  *
  * This is the callback method for the automatic help option. It displays a
  * help message with a list of available options and exits with code 0.
@@ -545,6 +604,25 @@ function _optparse_display_help($dummy_option,
                                 $parser)
 {
     $parser->print_help();
+
+    exit(0);
+}
+
+/**
+ * Show version information and exit
+ *
+ * This is the callback method for the automatic version option. It displays
+ * the version tag and exits with code 0.
+ *
+ * @return void
+ * @author Gabriel Filion
+ **/
+function _optparse_display_version($dummy_option,
+                                   $dummy_opt_text,
+                                   $dummy_value,
+                                   $parser)
+{
+    $parser->print_version();
 
     exit(0);
 }
