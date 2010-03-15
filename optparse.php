@@ -24,7 +24,7 @@ class OptionParser {
 
     function OptionParser($settings=array()) {
         $this->_positional = array();
-        $this->_options = array();
+        $this->option_list = array();
 
         $default_usage = _translate("%prog [arguments ...]");
         $this->set_usage( array_pop_elem($settings, "usage", $default_usage) );
@@ -47,7 +47,7 @@ class OptionParser {
         ) );
 
         if ( ! empty($settings) ) {
-            throw new UnknownSettingsException($settings);
+            throw new OptionError($settings);
         }
     }
 
@@ -65,7 +65,7 @@ class OptionParser {
             $option = $this->get_option($name);
 
             if ( $option !== Null ) {
-                if ( $this->_resolve_method == "resolve" ) {
+                if ( $this->conflict_handler == "resolve" ) {
                     $this->_resolve_option_conflict($option, $name, $this);
                 }
                 else {
@@ -74,7 +74,7 @@ class OptionParser {
             }
         }
 
-        $this->_options[] = $new_option;
+        $this->option_list[] = $new_option;
     }
 
     /**
@@ -90,7 +90,7 @@ class OptionParser {
     public function get_option($text) {
         $found = Null;
 
-        foreach ($this->_options as $opt) {
+        foreach ($this->option_list as $opt) {
             if ( in_array($text, $opt->option_strings) ) {
                 $found = $opt;
                 break;
@@ -110,7 +110,7 @@ class OptionParser {
      * @author Gabriel Filion
      **/
     public function has_option($text) {
-        foreach ($this->_options as $opt) {
+        foreach ($this->option_list as $opt) {
             if ( in_array($text, $opt->option_strings) ) {
                 return true;
             }
@@ -132,11 +132,11 @@ class OptionParser {
     public function remove_option($text) {
         $found = false;
 
-        foreach ($this->_options as $key => $opt) {
+        foreach ($this->option_list as $key => $opt) {
             if ( in_array($text, $opt->option_strings) ) {
                 $strings = $opt->option_strings;
 
-                unset( $this->_options[$key] );
+                unset( $this->option_list[$key] );
                 $found = true;
 
                 $this->_reenable_option_strings($strings);
@@ -162,14 +162,7 @@ class OptionParser {
      * @author Gabriel Filion
      **/
     public function set_usage($new_usage) {
-        // Replace occurences of %prog to the program name
-        $new_usage = preg_replace(
-            "/\%prog/",
-            get_prog_name(),
-            $new_usage
-        );
-
-        $this->_usage = $new_usage;
+        $this->usage = $new_usage;
     }
 
     /**
@@ -179,7 +172,7 @@ class OptionParser {
      * @author Gabriel Filion
      **/
     public function get_usage() {
-        return $this->_usage;
+        return $this->usage;
     }
 
     /**
@@ -192,7 +185,14 @@ class OptionParser {
      * @author Gabriel Filion
      **/
     public function print_usage($stream=STDOUT) {
-        fprintf($stream, "Usage: ". $this->get_usage(). "\n\n" );
+        // Replace occurences of %prog to the program name
+        $usage = preg_replace(
+            "/\%prog/",
+            get_prog_name(),
+            $this->get_usage()
+        );
+
+        fprintf($stream, "Usage: ". $usage. "\n\n" );
     }
 
     /**
@@ -264,7 +264,7 @@ class OptionParser {
             throw new InvalidArgumentException($msg);
         }
 
-        $this->_resolve_method = $handler;
+        $this->conflict_handler = $handler;
     }
 
     /**
@@ -305,8 +305,8 @@ class OptionParser {
             $opt_values = array();
         }
 
-        if ( count($opt_values) < $option->nb_values ) {
-            if ($option->nb_values == 1) {
+        if ( count($opt_values) < $option->nargs ) {
+            if ($option->nargs == 1) {
                 $vals = array("option" => $argument);
                 $msg = _translate(
                     "%(option)s option takes a value.",
@@ -318,7 +318,7 @@ class OptionParser {
             else {
                 $vals = array(
                     "option" => $argument,
-                    "nbvals" => $option->nb_values
+                    "nbvals" => $option->nargs
                 );
                 $msg = _translate(
                     "%(option)s option takes %(nbvals)s values.",
@@ -334,7 +334,7 @@ class OptionParser {
             $value = true;
         }
         else {
-            if ($option->nb_values < 1) {
+            if ($option->nargs < 1) {
                 $vals = array("option" => $argument);
                 $msg = _translate(
                     "%(option)s option does not take a value.",
@@ -368,7 +368,7 @@ class OptionParser {
     {
         $option = $this->_get_known_option($argument);
 
-        $nbvals = $option->nb_values;
+        $nbvals = $option->nargs;
 
         if ( $nbvals == 0 ) {
             $value = True;
@@ -402,7 +402,7 @@ class OptionParser {
         }
 
         // If only one value, set it directly as the value (not in an array)
-        if ( $option->nb_values == 1 ) {
+        if ( $option->nargs == 1 ) {
             $value = $value[0];
         }
 
@@ -478,7 +478,7 @@ class OptionParser {
      * @author Gabriel Filion
      **/
     private function _reenable_option_strings($option_strings) {
-        $options = array_reverse($this->_options);
+        $options = array_reverse($this->option_list);
 
         foreach ($option_strings as $option_text) {
 
@@ -513,7 +513,7 @@ function _optparse_display_help($dummy_option,
 
     // List all available options
     print("Options:\n");
-    foreach ($parser->_options as $option) {
+    foreach ($parser->option_list as $option) {
         print("  ". $option->_str(). "\n" );
     }
 
@@ -575,19 +575,19 @@ class Option {
         $this->disabled_strings = array();
         $this->option_strings = $option_strings;
 
-        $this->help_text = _translate( array_pop_elem($settings, "help", "") );
+        $this->help = _translate( array_pop_elem($settings, "help", "") );
         $this->callback = array_pop_elem($settings, "callback", Null);
         $this->dest = array_pop_elem($settings, "dest", $longest_name);
 
-        $this->nb_values = array_pop_elem($settings, "nargs", 1);
-        if ($this->nb_values < 0) {
+        $this->nargs = array_pop_elem($settings, "nargs", 1);
+        if ($this->nargs < 0) {
             $msg = _translate("nargs setting to Option cannot be negative");
             throw new InvalidArgumentException($msg);
         }
 
         // Yell if any superfluous arguments are given.
         if ( ! empty($settings) ) {
-            throw new UnknownSettingsException($settings);
+            throw new OptionError($settings);
         }
     }
 
@@ -658,7 +658,7 @@ class Option {
             $call_method .= $name. " ". strtoupper($dest). " ";
         }
 
-        return $call_method. " ". _translate($this->help_text);
+        return $call_method. " ". _translate($this->help);
     }
 }
 
@@ -680,8 +680,8 @@ class OptionConflictError extends Exception {
  *
  * Exception raised when unknown options are passed to Option's constructor.
  **/
-class UnknownSettingsException extends Exception {
-    function UnknownSettingsException($arguments) {
+class OptionError extends Exception {
+    function OptionError($arguments) {
         $args_as_string = implode(", ", array_keys($arguments) );
 
         $msg = _translate(
