@@ -29,6 +29,8 @@ class OptionParser {
         $default_usage = _translate("%prog [arguments ...]");
         $this->set_usage( array_pop_elem($settings, "usage", $default_usage) );
 
+        $this->description = array_pop_elem($settings, "description", "");
+
         $add_help_option = array_pop_elem($settings, "add_help_option", true);
         if ($add_help_option) {
             $this->add_option( array(
@@ -213,6 +215,10 @@ class OptionParser {
     public function print_help($stream=STDOUT) {
         // Print usage
         $this->print_usage($stream);
+
+        if ($this->description) {
+            fprintf($stream, $this->description. "\n\n");
+        }
 
         // List all available options
         $msg = _translate("Options:");
