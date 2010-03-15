@@ -46,6 +46,12 @@ class OptionParser {
             "error"
         ) );
 
+        $this->prog = array_pop_elem(
+            $settings,
+            "prog",
+            get_prog_name()
+        );
+
         if ( ! empty($settings) ) {
             throw new OptionError($settings);
         }
@@ -188,7 +194,7 @@ class OptionParser {
         // Replace occurences of %prog to the program name
         $usage = preg_replace(
             "/\%prog/",
-            get_prog_name(),
+            $this->prog,
             $this->get_usage()
         );
 
