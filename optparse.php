@@ -27,10 +27,9 @@ class OptionParser {
         $this->_options = array();
 
         $default_usage = _translate("%prog [arguments ...]");
-        $this->set_usage( array_get($settings, "usage", $default_usage) );
+        $this->set_usage( array_pop_elem($settings, "usage", $default_usage) );
 
-        $add_help_option = array_get($settings, "add_help_option", true);
-
+        $add_help_option = array_pop_elem($settings, "add_help_option", true);
         if ($add_help_option) {
             $this->add_option( array(
                 "-h","--help",
@@ -39,6 +38,16 @@ class OptionParser {
                 "help" => "show this help message and exit",
                 "nargs" => 0
             ) );
+        }
+
+        $this->set_conflict_handler(array_pop_elem(
+            $settings,
+            "conflict_handler",
+            "error"
+        ) );
+
+        if ( ! empty($settings) ) {
+            throw new UnknownSettingsException($settings);
         }
     }
 
@@ -51,10 +60,17 @@ class OptionParser {
     public function add_option($settings) {
         $new_option = new Option($settings);
 
-        // Yell if an option text (e.g. --option) is already used.
-        foreach ( $new_option->argument_names as $name ) {
-            if ( $this->get_option($name) !== Null ) {
-                throw new DuplicateOptionException($name);
+        // Resolve conflict with the right conflict handler
+        foreach ( $new_option->option_strings as $name ) {
+            $option = $this->get_option($name);
+
+            if ( $option !== Null ) {
+                if ( $this->_resolve_method == "resolve" ) {
+                    $this->_resolve_option_conflict($option, $name, $this);
+                }
+                else {
+                    throw new OptionConflictError($name);
+                }
             }
         }
 
@@ -75,7 +91,7 @@ class OptionParser {
         $found = Null;
 
         foreach ($this->_options as $opt) {
-            if ( in_array($text, $opt->argument_names) ) {
+            if ( in_array($text, $opt->option_strings) ) {
                 $found = $opt;
                 break;
             }
@@ -95,7 +111,7 @@ class OptionParser {
      **/
     public function has_option($text) {
         foreach ($this->_options as $opt) {
-            if ( in_array($text, $opt->argument_names) ) {
+            if ( in_array($text, $opt->option_strings) ) {
                 return true;
             }
         }
@@ -117,9 +133,14 @@ class OptionParser {
         $found = false;
 
         foreach ($this->_options as $key => $opt) {
-            if ( in_array($text, $opt->argument_names) ) {
+            if ( in_array($text, $opt->option_strings) ) {
+                $strings = $opt->option_strings;
+
                 unset( $this->_options[$key] );
                 $found = true;
+
+                $this->_reenable_option_strings($strings);
+                break;
             }
         }
 
@@ -224,6 +245,37 @@ class OptionParser {
         }
 
         return new Values($values, $positional);
+    }
+
+    /**
+     * Set the option conflict handler
+     *
+     * Conflict handler can be one of "error" or "resolve".
+     *
+     * @return void
+     * @throws InvalidArgumentException on invalid handler name
+     * @author Gabriel Filion
+     **/
+    public function set_conflict_handler($handler) {
+        if ( ! in_array( $handler, array("error", "resolve") ) ) {
+            $msg = _translate(
+                "The conflict handler must be one of \"error\" or \"resolve\""
+            );
+            throw new InvalidArgumentException($msg);
+        }
+
+        $this->_resolve_method = $handler;
+    }
+
+    /**
+     * Exit program with an error message and code
+     *
+     * @return void
+     * @author Gabriel Filion
+     **/
+    public function error($text, $code) {
+        $this->print_usage(STDERR);
+        bail_out($text, $code);
     }
 
     /**
@@ -392,14 +444,54 @@ class OptionParser {
     }
 
     /**
-     * Exit program with an error message and code
+     * Resolve option conflicts intelligently
+     *
+     * This method is the resolver for option conflict_handler="resolve". It
+     * tries to resolve conflicts automatically. It disables an option string
+     * so that the last option added that uses this string has precedence.
+     *
+     * If an option sees its last string get disabled, it removes it entirely.
+     * Options that get removed cannot be automatically re-enabled later.
      *
      * @return void
      * @author Gabriel Filion
      **/
-    public function error($text, $code) {
-        $this->print_usage(STDERR);
-        bail_out($text, $code);
+    private function _resolve_option_conflict(&$old_option,
+                                             $option_text,
+                                             &$parser)
+    {
+        if ( count($old_option->option_strings) == 1 ) {
+            $parser->remove_option($option_text);
+            return;
+        }
+
+        $old_option->disable_string($option_text);
+    }
+
+    /**
+     * Re-enable an option string
+     *
+     * When the conflict handler is set to "resolve", some strings may be
+     * disabled. This method tries to reenable a string.
+     *
+     * @return void
+     * @author Gabriel Filion
+     **/
+    private function _reenable_option_strings($option_strings) {
+        $options = array_reverse($this->_options);
+
+        foreach ($option_strings as $option_text) {
+
+            foreach ($options as $option) {
+                $index = array_search($option_text, $option->disabled_strings);
+
+                if ($index !== false) {
+                    $option->option_strings[] = $option_text;
+                    unset( $option->disabled_strings[$index] );
+                    break;
+                }
+            }
+        }
     }
 }
 
@@ -448,13 +540,14 @@ class Values {
  * The option parser uses this class to represent options that are added to it.
  **/
 class Option {
+
     function Option($settings) {
-        $argument_names = array();
+        $option_strings = array();
 
         $i = 0;
         $longest_name = "";
         while ( $option_name = array_pop_elem($settings, "$i") ) {
-            $argument_names[] = $option_name;
+            $option_strings[] = $option_name;
 
             // Get the name without leading dashes
             if ($option_name[1] == "-") {
@@ -472,14 +565,15 @@ class Option {
             $i++;
         }
 
-        if ( empty($argument_names) ) {
+        if ( empty($option_strings) ) {
             $msg = _translate(
                 "An option must have at least one string representation"
             );
             throw new InvalidArgumentException($msg);
         }
 
-        $this->argument_names = $argument_names;
+        $this->disabled_strings = array();
+        $this->option_strings = $option_strings;
 
         $this->help_text = _translate( array_pop_elem($settings, "help", "") );
         $this->callback = array_pop_elem($settings, "callback", Null);
@@ -525,6 +619,29 @@ class Option {
     }
 
     /**
+     * Disable an option string (e.g. --option) from the option
+     *
+     * @return void
+     * @author Gabriel Filion
+     **/
+    public function disable_string($opt_text) {
+        $index = array_search($opt_text, $this->option_strings);
+
+        if ( $index === false ) {
+            $vals = array("opt" => $opt_text);
+            $msg = _translate(
+                "String \"%(opt)s\" is not part of the Option.",
+                $vals
+            );
+
+            throw new InvalidArgumentException($msg);
+        }
+
+        $this->disabled_strings[] = $this->option_strings[$index];
+        unset( $this->option_strings[$index] );
+    }
+
+    /**
      * String representation of the option.
      *
      * Format a string with option name and description so that it can be used
@@ -535,7 +652,7 @@ class Option {
      **/
     public function _str() {
         $call_method = "";
-        foreach ($this->argument_names as $name) {
+        foreach ($this->option_strings as $name) {
             //FIXME this is not correct. dest must be shown only when needed.
             $dest = _translate($this->dest);
             $call_method .= $name. " ". strtoupper($dest). " ";
@@ -551,8 +668,8 @@ class Option {
  * Exception raised when an option added tries to use a string representation
  * (e.g. "--option") that is already used by a previously added option.
  **/
-class DuplicateOptionException extends Exception {
-    function DuplicateOptionException($name) {
+class OptionConflictError extends Exception {
+    function OptionConflictError($name) {
         $msg = _translate("Duplicate definition of option \"$name\"");
         parent::__construct($msg);
     }
