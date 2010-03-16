@@ -14,6 +14,8 @@ require_once("utils.php");
 
 define("NO_SUCH_OPT_ERROR", 1);
 define("WRONG_VALUE_COUNT_ERROR", 2);
+// Default value for an option can be Null. We need an explicit no_default value
+define("NO_DEFAULT", "~~~NO~DEFAULT~~~");
 
 /**
  * Utility class for parsing arguments from the Command Line Interface
@@ -42,12 +44,15 @@ class OptionParser {
 
         $this->description = array_pop_elem($settings, "description", "");
 
+        $this->defaults = array();
+
         $add_help_option = array_pop_elem($settings, "add_help_option", true);
         if ($add_help_option) {
             $this->add_option( array(
                 "-h","--help",
                 "callback" => "_optparse_display_help",
                 "help" => _translate("show this help message and exit"),
+                "dest" => null,
                 "nargs" => 0
             ) );
         }
@@ -58,6 +63,7 @@ class OptionParser {
                 "--version",
                 "callback" => "_optparse_display_version",
                 "help" => _translate("show program's version number and exit"),
+                "dest" => null,
                 "nargs" => 0
             ) );
         }
@@ -83,13 +89,26 @@ class OptionParser {
     /**
      * Add an option that the parser must recognize.
      *
-     * @return void
+     * The argument can be either an array with settings for the option class's
+     * constructor, or an Option instance.
+     *
+     * @return Option object
+     * @throws InvalidArgumentException: if argument isn't an array or an Option
      * @author Gabriel Filion
      **/
     public function add_option($settings) {
-        $option_class = $this->option_class;
-
-        $new_option = new $option_class($settings);
+        if ( is_array($settings) ) {
+            $option_class = $this->option_class;
+            $new_option = new $option_class($settings);
+        }
+        else if ( is_a($settings, Option) ) {
+            $new_option = $settings;
+        }
+        else {
+            $vals = array("arg" => $settings);
+            $msg = _translate("not an Option instance: %(arg)s", $vals);
+            throw new InvalidArgumentException($msg);
+        }
 
         // Resolve conflict with the right conflict handler
         foreach ( $new_option->option_strings as $name ) {
@@ -106,6 +125,18 @@ class OptionParser {
         }
 
         $this->option_list[] = $new_option;
+
+        // Option has a destination. we need a default value
+        if ($new_option->dest !== Null) {
+            if ($new_option->default !== NO_DEFAULT) {
+                $this->defaults[$new_option->dest] = $new_option->default;
+            }
+            else if ( ! array_key_exists($new_option->dest, $this->defaults) ) {
+                $this->defaults[$new_option->dest] = Null;
+            }
+        }
+
+        return $new_option;
     }
 
     /**
@@ -321,7 +352,11 @@ class OptionParser {
         }
 
         if ($values === Null) {
-            $values = $this->_get_default_values();
+            $values = $this->get_default_values();
+        }
+        else {
+            // Get a copy of default values and update the array
+            $values = array_merge($this->get_default_values(), $values);
         }
 
         $rargs = $argv;
@@ -373,6 +408,44 @@ class OptionParser {
         }
 
         $this->conflict_handler = $handler;
+    }
+
+    /**
+     * Get the list of default values.
+     *
+     * @return array
+     * @author Gabriel Filion
+     **/
+    public function get_default_values() {
+        return $this->defaults;
+    }
+
+    /**
+     * Set default value for only one option
+     *
+     * Default values must have a key that corresponds to the "dest" argument of
+     * an option.
+     *
+     * @return void
+     * @author Gabriel Filion
+     **/
+    public function set_default($dest, $value) {
+        $this->defaults[$dest] = $value;
+    }
+
+    /**
+     * Set default values for multiple destinations
+     *
+     * Default values must have a key that corresponds to the "dest" argument of
+     * an option. Calling this function is the preferred way of setting default
+     * values for options, since multiple options can share the same
+     * destination.
+     *
+     * @return void
+     * @author Gabriel Filion
+     **/
+    public function set_defaults($values) {
+        $this->defaults = array_merge($this->defaults, $values);
     }
 
     /**
@@ -541,17 +614,6 @@ class OptionParser {
     }
 
     /**
-     * Get the list of default values.
-     *
-     * @return array
-     * @author Gabriel Filion
-     **/
-    private function _get_default_values() {
-        //TODO implement this
-        return array();
-    }
-
-    /**
      * Resolve option conflicts intelligently
      *
      * This method is the resolver for option conflict_handler="resolve". It
@@ -695,8 +757,9 @@ class Option {
         $this->disabled_strings = array();
         $this->option_strings = $option_strings;
 
-        $this->help = _translate( array_pop_elem($settings, "help", "") );
+        $this->help = array_pop_elem($settings, "help", "");
         $this->callback = array_pop_elem($settings, "callback", Null);
+        // FIXME dest can be Null if action is "callback"
         $this->dest = array_pop_elem($settings, "dest", $longest_name);
 
         $this->nargs = array_pop_elem($settings, "nargs", 1);
@@ -704,6 +767,10 @@ class Option {
             $msg = _translate("nargs setting to Option cannot be negative");
             throw new InvalidArgumentException($msg);
         }
+
+        // Using this can lead to results that are unexpected.
+        // Use OptionParser.set_defaults instead
+        $this->default = array_pop_elem($settings, "default", NO_DEFAULT);
 
         // Yell if any superfluous arguments are given.
         if ( ! empty($settings) ) {
@@ -732,7 +799,12 @@ class Option {
 
         if ($this->callback !== Null) {
             $callback = $this->callback;
-            $value = $callback($this, $opt_text, $value, $parser);
+            try {
+                $value = $callback($this, $opt_text, $value, $parser);
+            }
+            catch (OptionValueError $exc) {
+                $this->error( $exc->get_message() );
+            }
         }
 
         $values[$this->dest] = $value;
@@ -810,5 +882,14 @@ class OptionError extends Exception {
         parent::__construct($msg);
     }
 }
+
+/**
+ * Exception on incorrect value for an option
+ *
+ * This exception should be raised by callback functions if there is an error
+ * with the value that was passed to the option. optparses catches this and
+ * exits the program, after printing the message in the exception to stderr.
+ **/
+class OptionValueError extends Exception { }
 
 ?>
