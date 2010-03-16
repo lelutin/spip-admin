@@ -276,7 +276,7 @@ class OptionParser {
         $msg = _translate("Options:");
         fprintf($stream, $msg. "\n");
         foreach ($this->option_list as $option) {
-            fprintf($stream, "  ". $option->_str(). "\n" );
+            fprintf($stream, "  ". $option->__str__(). "\n" );
         }
 
         fprintf($stream, "\n");
@@ -553,7 +553,7 @@ class OptionParser {
         $nbvals = $option->nargs;
 
         if ( $nbvals < 1 ) {
-            $value = $this->default;
+            $value = $option->default;
         }
         else {
             $value = array();
@@ -799,7 +799,7 @@ class Option {
 
         $this->take_action(
             $this->action, $this->dest,
-            $value, $opt_text, $values, $parser
+            $value, $opt_string, $values, $parser
         );
     }
 
@@ -914,7 +914,7 @@ class Option {
      * @return void
      * @author Gabriel Filion
      **/
-    public function _set_defaults_by_action($action) {
+    private function _set_defaults_by_action($action) {
         switch ($action) {
         case "store_true":
             $this->nargs = 0;
@@ -942,6 +942,19 @@ class Option {
     }
 
     /**
+     * String representation for PHP5
+     *
+     * This is a wrapper for automatically displaying the option in PHP5 with
+     * the option strings and the description when it is printed out.
+     *
+     * @return String: name and description of the option
+     * @author Gabriel Filion
+     **/
+    public function __toString() {
+        return $this->__str__();
+    }
+
+    /**
      * String representation of the option.
      *
      * Format a string with option name and description so that it can be used
@@ -950,7 +963,7 @@ class Option {
      * @return String: name and description of the option
      * @author Gabriel Filion
      **/
-    public function _str() {
+    public function __str__() {
         $call_method = "";
         foreach ($this->option_strings as $name) {
             //FIXME this is not correct. dest must be shown only when needed.
