@@ -347,16 +347,18 @@ class OptionParser {
         array_shift($argv);
 
         if ( $values !== Null && ! is_array($values) ) {
-            $msg = _translate("Default values must be in an array");
+            $msg = _translate("Default values must be in an associative array");
             throw new InvalidArgumentException($msg);
         }
 
+        $this->values = array();
+
         if ($values === Null) {
-            $values = $this->get_default_values();
+            $this->values = $this->get_default_values();
         }
         else {
             // Get a copy of default values and update the array
-            $values = array_merge($this->get_default_values(), $values);
+            $this->values = array_merge($this->get_default_values(), $values);
         }
 
         $rargs = $argv;
@@ -379,15 +381,15 @@ class OptionParser {
             }
 
             if ( substr($arg, 0, 2) == "--" ) {
-                $this->_process_long_option($arg, $values);
+                $this->_process_long_option($arg, $this->values);
             }
             else {
                 // values will be removed from $rargs during this process
-                $this->_process_short_option($arg, $rargs, $values);
+                $this->_process_short_option($arg, $rargs, $this->values);
             }
         }
 
-        return new Values($values, $positional);
+        return new Values($this->values, $positional);
     }
 
     /**
