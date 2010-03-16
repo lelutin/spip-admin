@@ -762,6 +762,7 @@ class Option {
         $this->help = array_pop_elem($settings, "help", "");
         $this->callback = array_pop_elem($settings, "callback");
         $this->dest = array_pop_elem($settings, "dest", $this->dest);
+        $this->const = array_pop_elem($settings, "const", Null);
 
         $this->nargs = array_pop_elem($settings, "nargs", $this->nargs);
         if ($this->nargs < 0) {
@@ -829,7 +830,6 @@ class Option {
             $values[$dest] = $value;
             break;
         case "store_const":
-            // TODO add const setting
             $values[$dest] = $this->const;
             break;
         case "store_true":
@@ -857,7 +857,6 @@ class Option {
             $values[$dest] += 1;
             break;
         case "callback":
-            // TODO add option callback arguments
             if ($this->callback !== Null) {
                 $callback = $this->callback;
                 $value = $callback($this, $opt_string, $value, $parser);
@@ -916,6 +915,9 @@ class Option {
      **/
     private function _set_defaults_by_action($action) {
         switch ($action) {
+        case "store_const":
+            $this->nargs = 0;
+            break;
         case "store_true":
             $this->nargs = 0;
             $this->default = false;
@@ -925,7 +927,10 @@ class Option {
             $this->default = true;
             break;
         case "append":
+            $this->default = array();
+            break;
         case "append_const":
+            $this->nargs = 0;
             $this->default = array();
             break;
         case "count":
