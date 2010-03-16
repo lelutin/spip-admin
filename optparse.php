@@ -14,6 +14,8 @@ require_once("utils.php");
 
 define("NO_SUCH_OPT_ERROR", 1);
 define("WRONG_VALUE_COUNT_ERROR", 2);
+define("OPTION_VALUE_ERROR", 3);
+
 // Default value for an option can be Null. We need an explicit no_default value
 define("NO_DEFAULT", "~~~NO~DEFAULT~~~");
 
@@ -50,10 +52,8 @@ class OptionParser {
         if ($add_help_option) {
             $this->add_option( array(
                 "-h","--help",
-                "callback" => "_optparse_display_help",
-                "help" => _translate("show this help message and exit"),
-                "dest" => null,
-                "nargs" => 0
+                "action" => "help",
+                "help" => _translate("show this help message and exit")
             ) );
         }
 
@@ -61,10 +61,8 @@ class OptionParser {
         if ($this->version) {
             $this->add_option( array(
                 "--version",
-                "callback" => "_optparse_display_version",
-                "help" => _translate("show program's version number and exit"),
-                "dest" => null,
-                "nargs" => 0
+                "action" => "version",
+                "help" => _translate("show program's version number and exit")
             ) );
         }
 
@@ -530,7 +528,7 @@ class OptionParser {
             $value = $opt_values;
         }
 
-        $option->process($value, $arg_text, $values, $this);
+        $this->_process_option($option, $value, $arg_text, $values);
     }
 
     /**
@@ -549,12 +547,13 @@ class OptionParser {
                                            &$rargs,
                                            &$values)
     {
+        // TODO make this recognise conglomerates of short options (-abcvv)
         $option = $this->_get_known_option($argument);
 
         $nbvals = $option->nargs;
 
-        if ( $nbvals == 0 ) {
-            $value = True;
+        if ( $nbvals < 1 ) {
+            $value = $this->default;
         }
         else {
             $value = array();
@@ -580,7 +579,7 @@ class OptionParser {
         }
 
         while ( $nbvals ) {
-            $value[] = array_pop($rargs);
+            $value[] = array_shift($rargs);
             $nbvals--;
         }
 
@@ -589,7 +588,28 @@ class OptionParser {
             $value = $value[0];
         }
 
-        $option->process($value, $argument, $values, $this);
+        $this->_process_option($option, $value, $argument, $values);
+    }
+
+    /**
+     * Ask an option to process information
+     *
+     * Process an option. If it throws an OptionValueError, exit with an error
+     * message.
+     *
+     * @return void
+     * @author Gabriel Filion
+     **/
+    private function _process_option(&$option, $value, $arg_text, &$values) {
+        try {
+            $option->process($value, $arg_text, $values, $this);
+        }
+        catch (OptionValueError $exc) {
+            $this->error(
+                $exc->getMessage(),
+                OPTION_VALUE_ERROR
+            );
+        }
     }
 
     /**
@@ -668,44 +688,6 @@ class OptionParser {
 }
 
 /**
- * Show a help message and exit
- *
- * This is the callback method for the automatic help option. It displays a
- * help message with a list of available options and exits with code 0.
- *
- * @return void
- * @author Gabriel Filion
- **/
-function _optparse_display_help($dummy_option,
-                                $dummy_opt_text,
-                                $dummy_value,
-                                $parser)
-{
-    $parser->print_help();
-
-    exit(0);
-}
-
-/**
- * Show version information and exit
- *
- * This is the callback method for the automatic version option. It displays
- * the version tag and exits with code 0.
- *
- * @return void
- * @author Gabriel Filion
- **/
-function _optparse_display_version($dummy_option,
-                                   $dummy_opt_text,
-                                   $dummy_value,
-                                   $parser)
-{
-    $parser->print_version();
-
-    exit(0);
-}
-
-/**
  * Object returned by parse_args.
  *
  * It contains two attributes: one for the options and one for the positional
@@ -728,6 +710,7 @@ class Option {
     function Option($settings) {
         $option_strings = array();
 
+        // Get all option strings. They should be added without key in settings
         $i = 0;
         $longest_name = "";
         while ( $option_name = array_pop_elem($settings, "$i") ) {
@@ -759,20 +742,32 @@ class Option {
         $this->disabled_strings = array();
         $this->option_strings = $option_strings;
 
-        $this->help = array_pop_elem($settings, "help", "");
-        $this->callback = array_pop_elem($settings, "callback", Null);
-        // FIXME dest can be Null if action is "callback"
-        $this->dest = array_pop_elem($settings, "dest", $longest_name);
+        // Default values that may be overridden by sensible action defaults or
+        // by settings
+        $this->dest = $longest_name;
+        $this->nargs = 1;
+        $this->default = NO_DEFAULT;
 
-        $this->nargs = array_pop_elem($settings, "nargs", 1);
+        // Set some sensible defaults depending on the chosen action
+        $this->action = array_pop_elem($settings, "action", "store");
+        $this->_set_defaults_by_action($this->action);
+
+        // Get default value
+        //
+        // Using this can lead to results that are unexpected.
+        // Use OptionParser.set_defaults instead
+        $this->default = array_pop_elem($settings, "default", $this->default);
+
+        // Other option settings
+        $this->help = array_pop_elem($settings, "help", "");
+        $this->callback = array_pop_elem($settings, "callback");
+        $this->dest = array_pop_elem($settings, "dest", $this->dest);
+
+        $this->nargs = array_pop_elem($settings, "nargs", $this->nargs);
         if ($this->nargs < 0) {
             $msg = _translate("nargs setting to Option cannot be negative");
             throw new InvalidArgumentException($msg);
         }
-
-        // Using this can lead to results that are unexpected.
-        // Use OptionParser.set_defaults instead
-        $this->default = array_pop_elem($settings, "default", NO_DEFAULT);
 
         // Yell if any superfluous arguments are given.
         if ( ! empty($settings) ) {
@@ -783,33 +778,105 @@ class Option {
     /**
      * Process the option.
      *
-     * When used, the option must be processed. Verify value type. Call the
-     * callback, if needed.
+     * When used, the option must be processed. Convert value to the right
+     * type. Call the callback, if needed.
      *
      * Callback functions should have the following signature:
-     *     function x_callback(&$option, $opt_text, $value, &$parser) { }
+     *     function x_callback(&$option, $opt_string, $value, &$parser) { }
      *
-     * The name of the callback function is of no importance. The first and
-     * last arguments should be passed by reference so that doing anything to
-     * them is not done to a copy of the object only.
+     * The name of the callback function is of no importance as long as it can
+     * be called with a PHP dynamic evaluation (e.g. by doing $func="foo";
+     * $func(...); ). The first and last arguments should be passed by
+     * reference so that doing anything to them is not done to a copy of the
+     * object only.
+     *
+     * @return void
+     * @throws RuntimeException if an unknown action was requested
+     * @author Gabriel Filion
+     **/
+    public function process($value, $opt_string, &$values, &$parser) {
+        $this->convert_value($value, $opt_string);
+
+        $this->take_action(
+            $this->action, $this->dest,
+            $value, $opt_text, $values, $parser
+        );
+    }
+
+    /**
+     * Convert value to the requested type
      *
      * @return void
      * @author Gabriel Filion
      **/
-    public function process($value, $opt_text, &$values, &$parser) {
-        // FIXME No type checking as of now.
+    public function convert_value($value, $opt_string) {
+        // TODO implement type conversion
+    }
 
-        if ($this->callback !== Null) {
-            $callback = $this->callback;
-            try {
-                $value = $callback($this, $opt_text, $value, $parser);
+    /**
+     * Take an action
+     *
+     * Based on the requested action, do the right thing.
+     *
+     * @return void
+     * @throws RuntimeException if an unknown action was requested
+     * @author Gabriel Filion
+     **/
+    public function take_action($action, $dest,
+                                $value, $opt_string, &$values, &$parser) {
+        switch ($action) {
+        case "store":
+            $values[$dest] = $value;
+            break;
+        case "store_const":
+            // TODO add const setting
+            $values[$dest] = $this->const;
+            break;
+        case "store_true":
+            $values[$dest] = true;
+            break;
+        case "store_false":
+            $values[$dest] = false;
+            break;
+        case "append":
+            if ( ! is_array($values[$dest]) ) {
+                $values[$dest] = array();
             }
-            catch (OptionValueError $exc) {
-                $this->error( $exc->get_message() );
+            array_push($values[$dest], $value);
+            break;
+        case "append_const":
+            if ( ! is_array($values[$dest]) ) {
+                $values[$dest] = array();
             }
+            array_push($values[$dest], $this->const);
+            break;
+        case "count":
+            if ( ! is_int($values[$dest]) ) {
+                $values[$dest] = 0;
+            }
+            $values[$dest] += 1;
+            break;
+        case "callback":
+            // TODO add option callback arguments
+            if ($this->callback !== Null) {
+                $callback = $this->callback;
+                $value = $callback($this, $opt_string, $value, $parser);
+            }
+            break;
+        case "help":
+            $parser->print_help();
+            exit(0);
+            break;
+        case "version":
+            $parser->print_version();
+            exit(0);
+            break;
+        default:
+            $vals = array("action" => $action);
+            $msg = _translate("unknown action %(action)s", $vals);
+            throw new RuntimeException($msg);
         }
 
-        $values[$this->dest] = $value;
     }
 
     /**
@@ -833,6 +900,45 @@ class Option {
 
         $this->disabled_strings[] = $this->option_strings[$index];
         unset( $this->option_strings[$index] );
+    }
+
+    /**
+     * Set some sensible default values depending on the action that was chosen
+     *
+     * Some actions don't require one or another attribute. Set those to
+     * sensible defaults in order to have everything behave correctly.
+     *
+     * Values set here can be overridden by settings passed to the Option's
+     * constructor.
+     *
+     * @return void
+     * @author Gabriel Filion
+     **/
+    public function _set_defaults_by_action($action) {
+        switch ($action) {
+        case "store_true":
+            $this->nargs = 0;
+            $this->default = false;
+            break;
+        case "store_false":
+            $this->nargs = 0;
+            $this->default = true;
+            break;
+        case "append":
+        case "append_const":
+            $this->default = array();
+            break;
+        case "count":
+            $this->nargs = 0;
+            $this->default = 0;
+            break;
+        case "callback":
+        case "help":
+        case "version":
+            $this->nargs = 0;
+            $this->dest = null;
+            break;
+        }
     }
 
     /**
