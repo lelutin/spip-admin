@@ -373,12 +373,11 @@ class OptionParser {
             }
 
             // Options should begin with a dash. All else is positional
-            if ( substr($arg, 0, 1) != "-" ) {
+            // A single dash alone is also a positional argument
+            if ( substr($arg, 0, 1) != "-" || strlen($arg) == 1) {
                 $positional[] = $arg;
-                continue;
             }
-
-            if ( substr($arg, 0, 2) == "--" ) {
+            else if ( substr($arg, 0, 2) == "--" ) {
                 $this->_process_long_option($arg, $this->values);
             }
             else {
