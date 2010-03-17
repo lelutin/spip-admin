@@ -382,7 +382,7 @@ class OptionParser {
             }
             else {
                 // values will be removed from $rargs during this process
-                $this->_process_short_option($arg, $rargs, $this->values);
+                $this->_process_short_options($arg, $rargs, $this->values);
             }
         }
 
@@ -547,52 +547,68 @@ class OptionParser {
      * @return void
      * @author Gabriel Filion
      **/
-    private function _process_short_option($argument,
-                                           &$rargs,
-                                           &$values)
+    private function _process_short_options($argument,
+                                            &$rargs,
+                                            &$values)
     {
-        // TODO make this recognise conglomerates of short options (-abcvv)
-        $option = $this->_get_known_option($argument);
+        $characters = preg_split(
+            '//', substr($argument, 1), -1, PREG_SPLIT_NO_EMPTY
+        );
+        $i = 1;
+        $stop = false;
 
-        $nbvals = $option->nargs;
+        foreach($characters as $ch) {
+            $opt_string = "-". $ch;
+            $i++; // an option was consumed
 
-        if ( $nbvals < 1 ) {
-            $value = $option->default;
-        }
-        else {
-            $value = array();
-        }
+            $option = $this->_get_known_option($opt_string);
+            $nbvals = $option->nargs;
 
-        if ( count($rargs) < $nbvals ) {
-            if ( $nbvals == 1) {
-                $vals = array("option" => $argument);
-                $msg = _translate(
-                    "%(option)s option takes an argument.",
-                    $vals
-                );
+            if ( $nbvals < 1 ) {
+                $value = $option->default;
             }
             else {
-                $vals = array("option" => $argument, "nbargs" => $nbvals);
-                $msg = _translate(
-                    "%(option)s option takes %(nbargs)s arguments.",
-                    $vals
-                );
+                $value = array();
+                // The option expects values, insert the rest of $argument as
+                // the value.
+                if ( $i < strlen($argument) ) {
+                    array_unshift($rargs, substr($argument, $i) );
+                }
+                // ... and stop iterating.
+                $stop = true;
             }
 
-            $this->error($msg, WRONG_VALUE_COUNT_ERROR);
-        }
+            // Not enough values given
+            if ( count($rargs) < $nbvals ) {
+                $vals = array("option" => $opt_string);
+                if ( $nbvals == 1) {
+                    $msg = "an argument";
+                }
+                else {
+                    $vals["nbargs"] = $nbvals;
+                    $what = "%(nbargs)s arguments";
+                }
+                $msg = _translate("%(option)s option takes $what.", $vals);
 
-        while ( $nbvals ) {
-            $value[] = array_shift($rargs);
-            $nbvals--;
-        }
+                $this->error($msg, WRONG_VALUE_COUNT_ERROR);
+            }
 
-        // If only one value, set it directly as the value (not in an array)
-        if ( $option->nargs == 1 ) {
-            $value = $value[0];
-        }
+            while ( $nbvals ) {
+                $value[] = array_shift($rargs);
+                $nbvals--;
+            }
 
-        $this->_process_option($option, $value, $argument, $values);
+            // If only one value, set it directly as the value (not in an array)
+            if ( $option->nargs == 1 ) {
+                $value = $value[0];
+            }
+
+            $this->_process_option($option, $value, $opt_string, $values);
+
+            if ($stop) {
+                break;
+            }
+        }
     }
 
     /**
