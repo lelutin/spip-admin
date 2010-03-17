@@ -378,7 +378,7 @@ class OptionParser {
                 $positional[] = $arg;
             }
             else if ( substr($arg, 0, 2) == "--" ) {
-                $this->_process_long_option($arg, $this->values);
+                $this->_process_long_option($arg, $rargs, $this->values);
             }
             else {
                 // values will be removed from $rargs during this process
@@ -472,50 +472,17 @@ class OptionParser {
      * @return void
      * @author Gabriel Filion
      **/
-    private function _process_long_option($argument, &$values) {
+    private function _process_long_option($argument, &$rargs, &$values) {
         $key_value = explode("=", $argument, 2);
         $arg_text = $key_value[0];
 
         $option = $this->_get_known_option($arg_text);
 
+        // Add the first value if it was appended to the arg with =
         if ( count($key_value) > 1 ) {
-            $opt_values = explode(",", $key_value[1]);
-        }
-        else {
-            $opt_values = array();
-        }
-
-        if ( count($opt_values) < $option->nargs ) {
-            if ($option->nargs == 1) {
-                $vals = array("option" => $argument);
-                $msg = _translate(
-                    "%(option)s option takes a value.",
-                    $vals
-                );
-
-                $this->error($msg, WRONG_VALUE_COUNT_ERROR);
-            }
-            else {
-                $vals = array(
-                    "option" => $argument,
-                    "nbvals" => $option->nargs
-                );
-                $msg = _translate(
-                    "%(option)s option takes %(nbvals)s values.",
-                    $vals
-                );
-
-                $this->error($msg, WRONG_VALUE_COUNT_ERROR);
-            }
-
-        }
-
-        if (count($opt_values) < 1) {
-            $value = true;
-        }
-        else {
+            // Option didn't expect this value
             if ($option->nargs < 1) {
-                $vals = array("option" => $argument);
+                $vals = array("option" => $arg_text);
                 $msg = _translate(
                     "%(option)s option does not take a value.",
                     $vals
@@ -524,15 +491,10 @@ class OptionParser {
                 $this->error($msg, WRONG_VALUE_COUNT_ERROR);
             }
 
-            $value = $opt_values;
+            array_unshift($rargs, $key_value[1]);
         }
 
-        // If only one value, set it directly as the value (not in an array)
-        if ( is_array($value) && $option->nargs == 1 ) {
-            $value = $value[0];
-        }
-
-        $this->_process_option($option, $value, $arg_text, $values);
+        $this->_process_option($option, $rargs, $arg_text, $values);
     }
 
     /**
@@ -562,13 +524,8 @@ class OptionParser {
             $i++; // an option was consumed
 
             $option = $this->_get_known_option($opt_string);
-            $nbvals = $option->nargs;
 
-            if ( $nbvals < 1 ) {
-                $value = $option->default;
-            }
-            else {
-                $value = array();
+            if ( $option->nargs >= 1) {
                 // The option expects values, insert the rest of $argument as
                 // the value.
                 if ( $i < strlen($argument) ) {
@@ -578,32 +535,7 @@ class OptionParser {
                 $stop = true;
             }
 
-            // Not enough values given
-            if ( count($rargs) < $nbvals ) {
-                $vals = array("option" => $opt_string);
-                if ( $nbvals == 1) {
-                    $msg = "an argument";
-                }
-                else {
-                    $vals["nbargs"] = $nbvals;
-                    $what = "%(nbargs)s arguments";
-                }
-                $msg = _translate("%(option)s option takes $what.", $vals);
-
-                $this->error($msg, WRONG_VALUE_COUNT_ERROR);
-            }
-
-            while ( $nbvals ) {
-                $value[] = array_shift($rargs);
-                $nbvals--;
-            }
-
-            // If only one value, set it directly as the value (not in an array)
-            if ( $option->nargs == 1 ) {
-                $value = $value[0];
-            }
-
-            $this->_process_option($option, $value, $opt_string, $values);
+            $this->_process_option($option, $rargs, $opt_string, $values);
 
             if ($stop) {
                 break;
@@ -620,9 +552,44 @@ class OptionParser {
      * @return void
      * @author Gabriel Filion
      **/
-    private function _process_option(&$option, $value, $arg_text, &$values) {
+    private function _process_option(&$option, &$rargs,
+                                     $opt_string, &$values) {
+        $nbvals = $option->nargs;
+
+        if ( $nbvals < 1 ) {
+            $value = $option->default;
+        }
+        else {
+            $value = array();
+        }
+
+        // Not enough values given
+        if ( count($rargs) < $nbvals ) {
+            $vals = array("option" => $opt_string);
+            if ( $nbvals == 1) {
+                $what = "an argument";
+            }
+            else {
+                $vals["nbargs"] = $nbvals;
+                $what = "%(nbargs)s arguments";
+            }
+            $msg = _translate("%(option)s option takes $what.", $vals);
+
+            $this->error($msg, WRONG_VALUE_COUNT_ERROR);
+        }
+
+        while ( $nbvals ) {
+            $value[] = array_shift($rargs);
+            $nbvals--;
+        }
+
+        // If only one value, set it directly as the value (not in an array)
+        if ( $option->nargs == 1 ) {
+            $value = $value[0];
+        }
+
         try {
-            $option->process($value, $arg_text, $values, $this);
+            $option->process($value, $opt_string, $values, $this);
         }
         catch (OptionValueError $exc) {
             $this->error(
