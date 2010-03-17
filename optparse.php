@@ -527,6 +527,11 @@ class OptionParser {
             $value = $opt_values;
         }
 
+        // If only one value, set it directly as the value (not in an array)
+        if ( is_array($value) && $option->nargs == 1 ) {
+            $value = $value[0];
+        }
+
         $this->_process_option($option, $value, $arg_text, $values);
     }
 
