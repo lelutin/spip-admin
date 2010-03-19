@@ -461,13 +461,15 @@ class OptionParser {
     /**
      * Process a long option.
      *
-     * Long options are binary options, or they expect their value(s) to be
-     * appended to them with = as a separator. If an option expects more than
-     * one value, they should be a comma separated list.
+     * Long options that expect value(s) will get them from the next arguments
+     * given on the command line. The first value can also be appended to them
+     * with = as a separator.
+     *
      * Examples:
      *     program --enable-this
      *     program --option=value
-     *     program --option=value1,value2
+     *     program --option=value1 value2
+     *     program --option value1 value2
      *
      * @return void
      * @author Gabriel Filion
@@ -498,13 +500,19 @@ class OptionParser {
     }
 
     /**
-     * Process a short option.
+     * Process a conglomerate of short options.
      *
-     * Short options are binary options, or they expect their value(s) to be in
-     * the following arguments.
+     * Short options that expect value(s) will get them from the next
+     * arguments. The first value can also be typed right after the option
+     * without a space. Options can also be joined in conglomerates. Options
+     * that expect a value should be at the end of a conglomerate, since the
+     * rest of the argument will be evaluated as the option's value.
+     *
      * Examples:
      *     program -q
      *     program -d something
+     *     program -dsomething
+     *     program -vvf arg_to_f
      *
      * @return void
      * @author Gabriel Filion
