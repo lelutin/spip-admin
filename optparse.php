@@ -765,6 +765,10 @@ class Option {
         // Other option settings
         $this->help = array_pop_elem($settings, "help", "");
         $this->callback = array_pop_elem($settings, "callback");
+        $this->callback_args = array_pop_elem($settings, "callback_args", Null);
+        $this->_add_kwargs(
+            array_pop_elem($settings, "callback_kwargs", Null)
+        );
         $this->dest = array_pop_elem($settings, "dest", $this->dest);
         $this->const = array_pop_elem($settings, "const", NO_DEFAULT);
 
@@ -790,7 +794,8 @@ class Option {
      * type. Call the callback, if needed.
      *
      * Callback functions should have the following signature:
-     *     function x_callback(&$option, $opt_string, $value, &$parser) { }
+     *     function x_callback(&$option, $opt_string, $value,
+     *                         &$parser, $callback_args) { }
      *
      * The name of the callback function is of no importance as long as it can
      * be called with a PHP dynamic evaluation (e.g. by doing $func="foo";
@@ -866,7 +871,8 @@ class Option {
         case "callback":
             if ($this->callback !== Null) {
                 $callback = $this->callback;
-                $value = $callback($this, $opt_string, $value, $parser);
+                $value = $callback($this, $opt_string, $value,
+                                   $parser, $this->callback_args);
             }
             break;
         case "help":
@@ -906,6 +912,38 @@ class Option {
 
         $this->disabled_strings[] = $this->option_strings[$index];
         unset( $this->option_strings[$index] );
+    }
+
+    /**
+     * Update callback_args with callback_kwargs
+     *
+     * Values already defined in callback_args will get overridden
+     *
+     * @return void
+     * @author Gabriel Filion
+     **/
+    private function _add_kwargs($kwargs) {
+        if ($kwargs === Null) {
+            return;
+        }
+
+        if ( ! is_array($kwargs) ) {
+            $vals = array("args" => $kwargs);
+            $msg = _translate(
+                "'callback_kwargs', if supplied must be an array. not: %(args)s",
+                $vals
+            );
+            throw new OptionError($msg);
+        }
+
+        if ($this->action !== "callback") {
+            $msg = _translate(
+                "'callback_kwargs' supplied for non-callback option"
+            );
+            throw new OptionError($msg);
+        }
+
+        $this->callback_args = array_merge($this->callback_args, $kwargs);
     }
 
     /**
@@ -976,11 +1014,50 @@ class Option {
             }
         }
 
-        if ($this->action == "callback" && $this->callback === Null) {
-            $msg = _translate(
-                "'callback' must be supplied for action callback"
-            );
-            throw new OptionError($msg);
+        if ($this->action == "callback") {
+            if ($this->callback === Null) {
+                $msg = _translate(
+                    "'callback' must be supplied for action callback"
+                );
+                throw new OptionError($msg);
+            }
+
+            if ( ! function_exists($this->callback) ) {
+                $vals = array("function" => $this->callback);
+                $msg = _translate(
+                    "callback not callable: %(function)s",
+                    $vals
+                );
+                throw new OptionError($msg);
+            }
+
+            if ( $this->callback_args !== Null &&
+                 ! is_array($this->callback_args) )
+            {
+                $vals = array("args" => $this->callback_args);
+                $msg = _translate(
+                    "'callback_args', if supplied must be an array. not: %(args)s",
+                    $vals
+                );
+                throw new OptionError($msg);
+            }
+        }
+        else {
+            if ($this->callback !== Null) {
+                $vals = array("function" => $this->callback);
+                $msg = _translate(
+                    "'callback' supplied (%(function)s) for non-callback option",
+                    $vals
+                );
+                throw new OptionError($msg);
+            }
+
+            if ($this->callback_args !== Null) {
+                $msg = _translate(
+                    "'callback_args' supplied for non-callback option"
+                );
+                throw new OptionError($msg);
+            }
         }
     }
 
