@@ -535,7 +535,7 @@ class OptionParser {
 
             if ( $option->nargs >= 1) {
                 // The option expects values, insert the rest of $argument as
-                // the value.
+                // another argument (in rargs), if there is anything.
                 if ( $i < strlen($argument) ) {
                     array_unshift($rargs, substr($argument, $i) );
                 }
@@ -702,6 +702,15 @@ class Values {
  **/
 class Option {
 
+    /**
+     * Those actions use a constant to store information. They should be paired
+     * with a "const" argument to the Option constructor.
+     **/
+    private $CONST_ACTIONS = array(
+        "store_const",
+        "append_const"
+    );
+
     function Option($settings) {
         $option_strings = array();
 
@@ -757,7 +766,7 @@ class Option {
         $this->help = array_pop_elem($settings, "help", "");
         $this->callback = array_pop_elem($settings, "callback");
         $this->dest = array_pop_elem($settings, "dest", $this->dest);
-        $this->const = array_pop_elem($settings, "const", Null);
+        $this->const = array_pop_elem($settings, "const", NO_DEFAULT);
 
         $this->nargs = array_pop_elem($settings, "nargs", $this->nargs);
         if ($this->nargs < 0) {
@@ -769,6 +778,9 @@ class Option {
         if ( ! empty($settings) ) {
             throw new OptionError($settings);
         }
+
+        // Make sure all the relevant information was given
+        $this->_verify_settings_dependancies($settings);
     }
 
     /**
@@ -942,6 +954,37 @@ class Option {
     }
 
     /**
+     * Verify that actions are used with the right arguments.
+     *
+     * Some actions require the presence of other arguments to the Option
+     * constructor. For example, actions that store a value should always be
+     * used with a destination. Verify those dependancies and throw an
+     * exception if things are not right.
+     *
+     * @return void
+     * @author Gabriel Filion
+     **/
+    private function _verify_settings_dependancies() {
+        if ( ! in_array($this->action, $this->CONST_ACTIONS) ) {
+            if ( $this->const !== NO_DEFAULT ) {
+                $vals = array("action" => $this->action);
+                $msg = _translate(
+                    "'const' must not be supplied for action %(action)s",
+                    $vals
+                );
+                throw new OptionError($msg);
+            }
+        }
+
+        if ($this->action == "callback" && $this->callback === Null) {
+            $msg = _translate(
+                "'callback' must be supplied for action callback"
+            );
+            throw new OptionError($msg);
+        }
+    }
+
+    /**
      * String representation for PHP5
      *
      * This is a wrapper for automatically displaying the option in PHP5 with
@@ -989,18 +1032,29 @@ class OptionConflictError extends Exception {
 }
 
 /**
- * Exception on superfluous arguments
+ * Exception on superfluous or conflicting arguments
  *
- * Exception raised when unknown options are passed to Option's constructor.
+ * Exception raised when unknown options are passed to Option's constructor or
+ * when conflitcting settings are passed to the Option constructor.
  **/
 class OptionError extends Exception {
     function OptionError($arguments) {
+        if ( is_array($arguments) ) {
+            $msg = $this->unknown_settings($arguments);
+        }
+        else {
+            $msg = $arguments;
+        }
+
+        parent::__construct($msg);
+    }
+
+    function unknown_settings($arguments) {
         $args_as_string = implode(", ", array_keys($arguments) );
 
-        $msg = _translate(
+        return _translate(
             "The following settings are unknown: $args_as_string"
         );
-        parent::__construct($msg);
     }
 }
 
