@@ -22,7 +22,7 @@ define("NO_DEFAULT", "~~~NO~DEFAULT~~~");
 /**
  * Utility class for parsing arguments from the Command Line Interface
  *
- * @author Gabriel Filion
+ * @author Gabriel Filion <lelutin@gmail.com>
  */
 class OptionParser {
 
@@ -92,7 +92,7 @@ class OptionParser {
      *
      * @return Option object
      * @throws InvalidArgumentException: if argument isn't an array or an Option
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function add_option($settings) {
         if ( is_array($settings) ) {
@@ -145,7 +145,7 @@ class OptionParser {
      *
      * @return Option object: when the option is found
      * @return Null: when the option is not found
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function get_option($text) {
         $found = Null;
@@ -167,7 +167,7 @@ class OptionParser {
      * string. It is a convenient way to verify if an option was already added.
      *
      * @return boolean: true if option is present, false if not
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function has_option($text) {
         foreach ($this->option_list as $opt) {
@@ -187,7 +187,7 @@ class OptionParser {
      * not correspond to an option, a OutOfBoundsException is thrown.
      *
      * @return void
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function remove_option($text) {
         $found = false;
@@ -219,7 +219,7 @@ class OptionParser {
      * Set the usage text
      *
      * @return void
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function set_usage($new_usage) {
         $this->usage = $new_usage;
@@ -229,7 +229,7 @@ class OptionParser {
      * Retrieve usage string
      *
      * @return String
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function get_usage() {
         return $this->usage;
@@ -242,7 +242,7 @@ class OptionParser {
      * another stream as argument.
      *
      * @return void
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function print_usage($stream=STDOUT) {
         // Replace occurences of %prog to the program name
@@ -262,7 +262,7 @@ class OptionParser {
      * stream is stdout. To change it, pass another stream as argument.
      *
      * @return void
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function print_help($stream=STDOUT) {
         // Print usage
@@ -289,7 +289,7 @@ class OptionParser {
      * change it, pass another stream as argument.
      *
      * @return void
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function print_version($stream=STDOUT) {
         // Replace occurences of %prog to the program name
@@ -306,7 +306,7 @@ class OptionParser {
      * Retrieve the program name as shown by usage
      *
      * @return String
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function get_prog_name() {
         return $this->prog;
@@ -316,7 +316,7 @@ class OptionParser {
      * Retrieve the description
      *
      * @return String
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function get_description() {
         return $this->description;
@@ -326,7 +326,7 @@ class OptionParser {
      * Retrieve the version tag
      *
      * @return String
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function get_version() {
         return $this->version;
@@ -338,7 +338,7 @@ class OptionParser {
      * Given an array of arguments, parse them and create an object containing
      * expected values and positional arguments.
      *
-     * @author Gabriel Filion <gfilion@revolutionlinux.com>
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function parse_args($argv, $values=Null){
         // Pop out the first argument, it is assumed to be the command name
@@ -396,7 +396,7 @@ class OptionParser {
      *
      * @return void
      * @throws InvalidArgumentException on invalid handler name
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function set_conflict_handler($handler) {
         if ( ! in_array( $handler, array("error", "resolve") ) ) {
@@ -413,7 +413,7 @@ class OptionParser {
      * Get the list of default values.
      *
      * @return array
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function get_default_values() {
         return $this->defaults;
@@ -426,7 +426,7 @@ class OptionParser {
      * an option.
      *
      * @return void
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function set_default($dest, $value) {
         $this->defaults[$dest] = $value;
@@ -441,7 +441,7 @@ class OptionParser {
      * destination.
      *
      * @return void
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function set_defaults($values) {
         $this->defaults = array_merge($this->defaults, $values);
@@ -451,7 +451,7 @@ class OptionParser {
      * Exit program with an error message and code
      *
      * @return void
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function error($text, $code) {
         $this->print_usage(STDERR);
@@ -472,7 +472,7 @@ class OptionParser {
      *     program --option value1 value2
      *
      * @return void
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     private function _process_long_option($argument, &$rargs, &$values) {
         $key_value = explode("=", $argument, 2);
@@ -515,7 +515,7 @@ class OptionParser {
      *     program -vvf arg_to_f
      *
      * @return void
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     private function _process_short_options($argument,
                                             &$rargs,
@@ -558,7 +558,7 @@ class OptionParser {
      * message.
      *
      * @return void
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     private function _process_option(&$option, &$rargs,
                                      $opt_string, &$values) {
@@ -614,7 +614,7 @@ class OptionParser {
      * found, exit with and error.
      *
      * @return Option object
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     private function _get_known_option($opt_text) {
         $option = $this->get_option($opt_text);
@@ -641,7 +641,7 @@ class OptionParser {
      * Options that get removed cannot be automatically re-enabled later.
      *
      * @return void
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     private function _resolve_option_conflict(&$old_option,
                                              $option_text,
@@ -662,7 +662,7 @@ class OptionParser {
      * disabled. This method tries to reenable a string.
      *
      * @return void
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     private function _reenable_option_strings($option_strings) {
         $options = array_reverse($this->option_list);
@@ -805,7 +805,7 @@ class Option {
      *
      * @return void
      * @throws RuntimeException if an unknown action was requested
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function process($value, $opt_string, &$values, &$parser) {
         $this->convert_value($value, $opt_string);
@@ -820,7 +820,7 @@ class Option {
      * Convert value to the requested type
      *
      * @return void
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function convert_value($value, $opt_string) {
         // TODO implement type conversion
@@ -833,7 +833,7 @@ class Option {
      *
      * @return void
      * @throws RuntimeException if an unknown action was requested
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function take_action($action, $dest,
                                 $value, $opt_string, &$values, &$parser) {
@@ -895,7 +895,7 @@ class Option {
      * Disable an option string (e.g. --option) from the option
      *
      * @return void
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function disable_string($opt_text) {
         $index = array_search($opt_text, $this->option_strings);
@@ -920,7 +920,7 @@ class Option {
      * Values already defined in callback_args will get overridden
      *
      * @return void
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     private function _add_kwargs($kwargs) {
         if ($kwargs === Null) {
@@ -956,7 +956,7 @@ class Option {
      * constructor.
      *
      * @return void
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     private function _set_defaults_by_action($action) {
         switch ($action) {
@@ -1000,7 +1000,7 @@ class Option {
      * exception if things are not right.
      *
      * @return void
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     private function _verify_settings_dependancies() {
         if ( ! in_array($this->action, $this->CONST_ACTIONS) ) {
@@ -1068,7 +1068,7 @@ class Option {
      * the option strings and the description when it is printed out.
      *
      * @return String: name and description of the option
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function __toString() {
         return $this->__str__();
@@ -1081,7 +1081,7 @@ class Option {
      * for a help message.
      *
      * @return String: name and description of the option
-     * @author Gabriel Filion
+     * @author Gabriel Filion <lelutin@gmail.com>
      **/
     public function __str__() {
         $call_method = "";
