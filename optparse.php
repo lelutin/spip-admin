@@ -10,6 +10,8 @@
  *   $parser->add_option(array("-f", "--foo", "dest"=>"bar"));
  *   $values = $parser->parse_args($argv);
  */
+if (! defined("__OPTPARSE_PHP") ) {
+define("__OPTPARSE_PHP", "");
 require_once("utils.php");
 
 define("NO_SUCH_OPT_ERROR", 1);
@@ -1144,4 +1146,5 @@ class OptionError extends Exception {
  **/
 class OptionValueError extends Exception { }
 
+} // __OPTPARSE_PHP
 ?>
