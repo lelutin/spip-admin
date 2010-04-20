@@ -43,7 +43,7 @@ class OptionParser {
             throw new InvalidArgumentException($msg);
         }
 
-        $default_usage = _translate("%prog [arguments ...]");
+        $default_usage = _translate("%prog [options]");
         $this->set_usage( array_pop_elem($settings, "usage", $default_usage) );
 
         $this->description = array_pop_elem($settings, "description", "");
@@ -705,6 +705,34 @@ class Values {
 class Option {
 
     /**
+     * Set of possible types for options.
+     **/
+    private $TYPES = array(
+        "string",
+        "int",
+        "long",
+        "float",
+        "choice"
+    );
+
+    /**
+     * Set of actions which may consume an argument for type.
+     **/
+    private $TYPED_ACTIONS = array(
+        "store",
+        "append",
+        "callback"
+    );
+
+    /**
+     * Set of actions which require the type to be specified as an argument.
+     **/
+    private $ALWAYS_TYPED_ACTIONS = array(
+        "store",
+        "append"
+    );
+
+    /**
      * Those actions use a constant to store information. They should be paired
      * with a "const" argument to the Option constructor.
      **/
@@ -747,6 +775,10 @@ class Option {
 
         $this->disabled_strings = array();
         $this->option_strings = $option_strings;
+
+        $this->type = array_pop_elem($settings, "type", Null);
+
+        $this->choices = array_pop_elem($settings, "choices", Null);
 
         // Default values that may be overridden by sensible action defaults or
         // by settings
@@ -824,8 +856,86 @@ class Option {
      * @return void
      * @author Gabriel Filion <lelutin@gmail.com>
      **/
-    public function convert_value($value, $opt_string) {
-        // TODO implement type conversion
+    public function convert_value(&$value, $opt_string) {
+        if (is_array($value) ) {
+            foreach ($value as $val) {
+                $this->_check_choice($val, $opt_string);
+                $this->_check_builtin($val, $opt_string);
+            }
+
+            return;
+        }
+        else {
+            $this->_check_choice($value, $opt_string);
+            $this->_check_builtin($value, $opt_string);
+        }
+    }
+
+    /**
+     * Check that a value is one of the specified choices. If the value is not
+     * a correct choice, raise an OptionValueError exception.
+     *
+     * @return void
+     * @author Gabriel Filion <lelutin@gmail.com>
+     **/
+    private function _check_choice($value, $opt_string) {
+        if ($this->choices !== Null && ! in_array($value, $this->choices) ) {
+            $vals = array(
+                "opt" => $opt_string,
+                "val" => $value,
+                "choices" => join(",", $this->choices)
+            );
+            $msg = _translate(
+                "option %(opt)s: invalid choice: %(val)s (choose from %(choices)s)",
+                $vals
+            );
+            throw new OptionValueError($msg);
+        }
+    }
+
+    /**
+     * Convert a value to a builtin type. If the conversion fails, raise an
+     * OptionValueError exception.
+     *
+     * @return void
+     * @author Gabriel Filion <lelutin@gmail.com>
+     **/
+    private function _check_builtin(&$value, $opt_string) {
+        $error = false;
+
+        $orig_value = $value;
+
+        switch($this->type) {
+        case "string":
+            // Nothing to do, value is already a string.
+            break;
+        case "int":
+        case "long":
+            $value = intval($value);
+            $error = $orig_value != strval($value);
+            break;
+        case "float":
+            $error = ! is_numeric($value);
+            $value = floatval($value);
+            break;
+        default:
+            $vals = array("type" => $this->type);
+            $msg = _translate("Unknown type: %(type)s");
+            throw new OptionError($msg);
+        }
+
+        if ($error) {
+            $vals = array(
+                "opt" => $opt_string,
+                "type" => $this->type,
+                "val" => $orig_value
+            );
+            $msg = _translate(
+                "option %(opt)s: invalid %(type)s value: %(val)s",
+                $vals
+            );
+            throw new OptionValueError($msg);
+        }
     }
 
     /**
@@ -961,35 +1071,42 @@ class Option {
      * @author Gabriel Filion <lelutin@gmail.com>
      **/
     private function _set_defaults_by_action($action) {
+        if ($this->type === Null) {
+            if (in_array($action, $this->ALWAYS_TYPED_ACTIONS) ) {
+                if ($this->choices !== Null) {
+                    // The "choices" attribute implies type "choice"
+                    $this->type = "choice";
+                }
+                else {
+                    // No type? "string" is probably what you want
+                    $this->type = "string";
+                }
+            }
+        }
+
         switch ($action) {
-        case "store_const":
-            $this->nargs = 0;
-            break;
         case "store_true":
-            $this->nargs = 0;
             $this->default = false;
             break;
         case "store_false":
-            $this->nargs = 0;
             $this->default = true;
             break;
         case "append":
-            $this->default = array();
-            break;
         case "append_const":
-            $this->nargs = 0;
             $this->default = array();
             break;
         case "count":
-            $this->nargs = 0;
             $this->default = 0;
             break;
         case "callback":
         case "help":
         case "version":
-            $this->nargs = 0;
             $this->dest = null;
             break;
+        }
+
+        if (! in_array($action, $this->TYPED_ACTIONS) ) {
+            $this->nargs = 0;
         }
     }
 
@@ -1013,6 +1130,62 @@ class Option {
                     $vals
                 );
                 throw new OptionError($msg);
+            }
+        }
+
+        if ($this->type !== Null) {
+            if (! in_array($this->type, $this->TYPES) ) {
+                $vals = array("type" => $this->type);
+                $msg = _translate(
+                    "invalid option type: %(type)s",
+                    $vals
+                );
+                throw new OptionError($msg);
+            }
+
+            if (! in_array($this->action, $this->TYPED_ACTIONS) ) {
+                $vals = array("action" => $this->action);
+                $msg = _translate(
+                    "must not supply a type for action %(action)s",
+                    $vals
+                );
+                throw new OptionError($msg);
+            }
+        }
+
+        if ($this->type == "choice") {
+            if ($this->choices === Null) {
+                $msg = _translate(
+                    "must supply a list of choices for type 'choice'"
+                );
+                throw new OptionError($msg);
+            }
+            else if (! is_array($this->choices) ) {
+                $vals = array("ch" => gettype($this->choices) );
+                $msg = _translate(
+                    "choices must be a list of strings ('%(ch)s' supplied)",
+                    $vals
+                );
+                throw new OptionError($msg);
+            }
+        }
+        else if ($this->choices !== Null) {
+            $vals = array("type" => $this->type);
+            $msg = _translate(
+                "must not supply choices for type %(type)s",
+                $vals
+            );
+            throw new OptionError($msg);
+        }
+
+        if ( in_array($this->action, $this->TYPED_ACTIONS) ) {
+            // Set a sensible default of 1 argument for typed actions
+            if ($this->nargs === Null) {
+                $this->nargs = 1;
+            }
+        }
+        else {
+            if (! $this->nargs === Null) {
             }
         }
 
