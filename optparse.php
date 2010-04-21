@@ -32,9 +32,11 @@ define("NO_DEFAULT", "~~~NO~DEFAULT~~~");
  */
 class OptionParser {
 
+    protected $standard_option_list = array();
+
     function OptionParser($settings=array()) {
         $this->_positional = array();
-        $this->option_list = array();
+        $this->option_list = $this->standard_option_list;
 
         // This must come first so that calls to add_option can succeed.
         $this->option_class = array_pop_elem(
@@ -51,6 +53,7 @@ class OptionParser {
         $this->set_usage( array_pop_elem($settings, "usage", $default_usage) );
 
         $this->description = array_pop_elem($settings, "description", "");
+        $this->epilog = array_pop_elem($settings, "epilog", "");
 
         $this->defaults = array();
 
@@ -284,6 +287,10 @@ class OptionParser {
         fprintf($stream, $msg. "\n");
         foreach ($this->option_list as $option) {
             fprintf($stream, "  ". $option->__str__(). "\n" );
+        }
+
+        if ($this->epilog) {
+            fprintf($stream, "\n". $this->epilog. "\n");
         }
 
         fprintf($stream, "\n");
@@ -808,8 +815,15 @@ class Option {
         $this->_add_kwargs(
             array_pop_elem($settings, "callback_kwargs", Null)
         );
-        $this->dest = array_pop_elem($settings, "dest", $this->dest);
         $this->const = array_pop_elem($settings, "const", NO_DEFAULT);
+
+        // Destination and metavar
+        $this->dest = array_pop_elem($settings, "dest", $this->dest);
+        $this->metavar = array_pop_elem(
+            $settings,
+            "metavar",
+            strtoupper($this->dest)
+        );
 
         $this->nargs = array_pop_elem($settings, "nargs", $this->nargs);
         if ($this->nargs < 0) {
@@ -1259,9 +1273,8 @@ class Option {
     public function __str__() {
         $call_method = "";
         foreach ($this->option_strings as $name) {
-            //FIXME this is not correct. dest must be shown only when needed.
-            $dest = _translate($this->dest);
-            $call_method .= $name. " ". strtoupper($dest). " ";
+            //FIXME metavar must be shown only when needed.
+            $call_method .= $name. " ". $this->metavar. " ";
         }
 
         return $call_method. " ". _translate($this->help);
