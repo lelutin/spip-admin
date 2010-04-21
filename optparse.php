@@ -24,6 +24,10 @@ define("NO_DEFAULT", "~~~NO~DEFAULT~~~");
 /**
  * Utility class for parsing arguments from the Command Line Interface
  *
+ * This class has one difference from its Python counterpart: it has no
+ * "option_list" argument. This argument is currently marked as deprecated in
+ * python's optparse module in favor of using the add_option method.
+ *
  * @author Gabriel Filion <lelutin@gmail.com>
  */
 class OptionParser {
@@ -74,6 +78,7 @@ class OptionParser {
             "error"
         ) );
 
+        // The get_prog_name called here is from utils.php
         $this->prog = array_pop_elem(
             $settings,
             "prog",
@@ -707,7 +712,7 @@ class Option {
     /**
      * Set of possible types for options.
      **/
-    private $TYPES = array(
+    protected $TYPES = array(
         "string",
         "int",
         "long",
@@ -718,7 +723,7 @@ class Option {
     /**
      * Set of actions which may consume an argument for type.
      **/
-    private $TYPED_ACTIONS = array(
+    protected $TYPED_ACTIONS = array(
         "store",
         "append",
         "callback"
@@ -727,7 +732,7 @@ class Option {
     /**
      * Set of actions which require the type to be specified as an argument.
      **/
-    private $ALWAYS_TYPED_ACTIONS = array(
+    protected $ALWAYS_TYPED_ACTIONS = array(
         "store",
         "append"
     );
@@ -736,7 +741,7 @@ class Option {
      * Those actions use a constant to store information. They should be paired
      * with a "const" argument to the Option constructor.
      **/
-    private $CONST_ACTIONS = array(
+    protected $CONST_ACTIONS = array(
         "store_const",
         "append_const"
     );
