@@ -3,6 +3,8 @@
  * Utility functions for various common tasks that PHP doesn't provide good
  * mechanisms for.
  **/
+if (! defined("__UTILITY_FUNCTIONS_PHP") ) {
+define("__UTILITY_FUNCTIONS_PHP", "");
 
 /**
  * Get array value or default
@@ -153,4 +155,5 @@ function _translate_no_translation($text) {
     return $text;
 }
 
+} // __UTILITY_FUNCTIONS_PHP
 ?>
