@@ -906,9 +906,6 @@ class Option {
         $orig_value = $value;
 
         switch($this->type) {
-        case "string":
-            // Nothing to do, value is already a string.
-            break;
         case "int":
         case "long":
             $value = intval($value);
@@ -918,10 +915,6 @@ class Option {
             $error = ! is_numeric($value);
             $value = floatval($value);
             break;
-        default:
-            $vals = array("type" => $this->type);
-            $msg = _translate("Unknown type: %(type)s");
-            throw new OptionError($msg);
         }
 
         if ($error) {
